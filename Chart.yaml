@@ -1,0 +1,17 @@
+apiVersion: v2
+name: llm-helm-deployer
+description: One-click Helm chart to deploy a text LLM with vLLM (NVIDIA GPU, OpenAI-compatible API).
+type: application
+version: 0.1.0
+appVersion: "v0.6.3"
+keywords:
+  - llm
+  - vllm
+  - openai
+  - gpu
+  - inference
+home: https://github.com/vienfu/llm-helm-deployer
+sources:
+  - https://github.com/vienfu/llm-helm-deployer
+maintainers:
+  - name: vienfu
