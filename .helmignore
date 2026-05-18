@@ -9,4 +9,4 @@
 *.bak
 *.orig
 docs/
-tests/
+/tests/

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "llm-helm-deployer.fullname" . }}-test-connection"
+  labels:
+    {{- include "llm-helm-deployer.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          URL="http://{{ include "llm-helm-deployer.fullname" . }}:{{ .Values.service.port }}/v1/models"
+          {{- if .Values.auth.apiKey }}
+          curl -fsS -H "Authorization: Bearer $(VLLM_API_KEY)" "$URL"
+          {{- else }}
+          curl -fsS "$URL"
+          {{- end }}
+      {{- if .Values.auth.apiKey }}
+      env:
+        - name: VLLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "llm-helm-deployer.fullname" . }}-apikey
+              key: api-key
+      {{- end }}
