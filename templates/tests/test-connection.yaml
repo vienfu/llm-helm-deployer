@@ -18,7 +18,7 @@ spec:
           set -e
           URL="http://{{ include "llm-helm-deployer.fullname" . }}:{{ .Values.service.port }}/v1/models"
           {{- if .Values.auth.apiKey }}
-          curl -fsS -H "Authorization: Bearer $(VLLM_API_KEY)" "$URL"
+          curl -fsS -H "Authorization: Bearer ${VLLM_API_KEY}" "$URL"
           {{- else }}
           curl -fsS "$URL"
           {{- end }}

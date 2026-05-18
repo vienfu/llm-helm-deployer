@@ -10,7 +10,9 @@
 4. Chat completion：
    curl http://127.0.0.1:8000/v1/chat/completions \
      -H "Content-Type: application/json" \
-     {{- if .Values.auth.apiKey }}-H "Authorization: Bearer <YOUR_API_KEY>" \{{- end }}
+     {{- if .Values.auth.apiKey }}
+     -H "Authorization: Bearer <YOUR_API_KEY>" \
+     {{- end }}
      -d '{
        "model": "{{ include "llm-helm-deployer.servedModelName" . }}",
        "messages": [{"role":"user","content":"hello"}]
