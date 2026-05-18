@@ -1,0 +1,96 @@
+image:
+  repository: vllm/vllm-openai
+  tag: v0.6.3
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+model:
+  name: /models/Qwen2.5-7B-Instruct
+  servedName: ""
+  hostPath:
+    path: /data/models
+    type: Directory
+    mountPath: /models
+
+vllm:
+  tensorParallelSize: 1
+  gpuMemoryUtilization: 0.9
+  maxModelLen: ""
+  dtype: auto
+  trustRemoteCode: false
+  port: 8000
+  extraArgs: []
+
+auth:
+  apiKey: ""
+
+service:
+  type: ClusterIP
+  port: 8000
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: llm.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    nvidia.com/gpu: 1   # 模板会自动用 vllm.tensorParallelSize 覆盖
+  requests: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+probes:
+  startup:
+    enabled: true
+    failureThreshold: 60
+    periodSeconds: 10
+    httpGet:
+      path: /health
+      port: 8000
+  readiness:
+    enabled: true
+    periodSeconds: 10
+    httpGet:
+      path: /health
+      port: 8000
+  liveness:
+    enabled: true
+    periodSeconds: 30
+    httpGet:
+      path: /health
+      port: 8000
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    labels: {}
+    relabelings: []
+  grafanaDashboard:
+    enabled: false
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+securityContext: {}
+terminationGracePeriodSeconds: 60
+
+shm:
+  sizeLimit: 8Gi
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
