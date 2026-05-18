@@ -1,0 +1,20 @@
+1. 等待 Pod 就绪：
+   kubectl --namespace {{ .Release.Namespace }} rollout status deployment/{{ include "llm-helm-deployer.fullname" . }}
+
+2. 端口转发到本地：
+   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "llm-helm-deployer.fullname" . }} 8000:{{ .Values.service.port }}
+
+3. 列出模型：
+   curl http://127.0.0.1:8000/v1/models{{- if .Values.auth.apiKey }} -H "Authorization: Bearer <YOUR_API_KEY>"{{- end }}
+
+4. Chat completion：
+   curl http://127.0.0.1:8000/v1/chat/completions \
+     -H "Content-Type: application/json" \
+     {{- if .Values.auth.apiKey }}-H "Authorization: Bearer <YOUR_API_KEY>" \{{- end }}
+     -d '{
+       "model": "{{ include "llm-helm-deployer.servedModelName" . }}",
+       "messages": [{"role":"user","content":"hello"}]
+     }'
+
+5. /metrics 端点（被 ServiceMonitor 抓取）：
+   curl http://127.0.0.1:8000/metrics | head
