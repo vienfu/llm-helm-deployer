@@ -1,0 +1,12 @@
+{{- if .Values.metrics.grafanaDashboard.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "llm-helm-deployer.fullname" . }}-dashboard
+  labels:
+    {{- include "llm-helm-deployer.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  vllm-overview.json: |-
+{{ .Files.Get "dashboards/vllm-overview.json" | indent 4 }}
+{{- end }}
