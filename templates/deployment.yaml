@@ -90,7 +90,7 @@ spec:
           startupProbe:
             httpGet:
               path: {{ .Values.probes.startup.httpGet.path }}
-              port: {{ .Values.probes.startup.httpGet.port }}
+              port: http
             failureThreshold: {{ .Values.probes.startup.failureThreshold }}
             periodSeconds: {{ .Values.probes.startup.periodSeconds }}
           {{- end }}
@@ -98,14 +98,14 @@ spec:
           readinessProbe:
             httpGet:
               path: {{ .Values.probes.readiness.httpGet.path }}
-              port: {{ .Values.probes.readiness.httpGet.port }}
+              port: http
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
           {{- end }}
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.liveness.httpGet.path }}
-              port: {{ .Values.probes.liveness.httpGet.port }}
+              port: http
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
           {{- end }}
       {{- with .Values.nodeSelector }}
