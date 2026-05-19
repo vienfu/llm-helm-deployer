@@ -1,0 +1,125 @@
+ci/ingress-values.yaml
+  8b3e277f03fd32fc 1-8 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a0c1ce4c4ad8aa4d1004fc8","tool_type":"agent","tool_id":"Write","line_ranges":[{"Range":[1,8]}]}]}
+ci/tp2-values.yaml
+  8b3e277f03fd32fc 1-2 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a0c1ce4c4ad8aa4d1004fc8","tool_type":"agent","tool_id":"Write","line_ranges":[{"Range":[1,2]}]}]}
+ci/auth-values.yaml
+  8b3e277f03fd32fc 1-2 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a0c1ce4c4ad8aa4d1004fc8","tool_type":"agent","tool_id":"Write","line_ranges":[{"Range":[1,2]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "2f1432f02b4f3460480130b0654884faef5b84d6",
+  "prompts": {
+    "8b3e277f03fd32fc": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0aa400c4ad8aa4d1004baf",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 0,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "ci/auth-values.yaml": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              2
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a0c1ce4c4ad8aa4d1004fc8",
+            "tool_type": "agent",
+            "tool_id": "Write",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  2
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "ci/ingress-values.yaml": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              8
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a0c1ce4c4ad8aa4d1004fc8",
+            "tool_type": "agent",
+            "tool_id": "Write",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  8
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "ci/tp2-values.yaml": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              2
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a0c1ce4c4ad8aa4d1004fc8",
+            "tool_type": "agent",
+            "tool_id": "Write",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  2
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "8b3e277f03fd32fc": {
+      "tool": "trae",
+      "conversation_id": "6a0aa400c4ad8aa4d1004baf",
+      "session_id": "6a0aa400c4ad8aa4d1004baf",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
