@@ -2,6 +2,8 @@
 
 一键部署 LLM（基于 vLLM、NVIDIA GPU、OpenAI 兼容 API）的 Helm Chart。
 
+> Chart 位于 [`manifests/`](./manifests) 子目录。
+
 ## 前置依赖
 
 - Kubernetes 集群
