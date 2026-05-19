@@ -5,7 +5,11 @@ metadata:
   name: {{ include "llm-helm-deployer.fullname" . }}
   labels:
     {{- include "llm-helm-deployer.labels" . | nindent 4 }}
-    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- $userLabels := .Values.metrics.serviceMonitor.labels | default dict }}
+    {{- if and (index .Values "kube-prometheus-stack" "enabled") (not (hasKey $userLabels "release")) }}
+    release: {{ .Release.Name }}
+    {{- end }}
+    {{- with $userLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:

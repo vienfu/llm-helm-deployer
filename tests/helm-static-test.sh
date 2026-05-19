@@ -73,4 +73,15 @@ out=$(helm template t . -n llm --set 'dcgm-exporter.enabled=true')
 echo "$out" | grep -q "kind: DaemonSet" || fail "dcgm-exporter on but DaemonSet not rendered"
 pass "dcgm-exporter toggle on"
 
+# 联动 1：kps 开启时 ServiceMonitor 自动带 release=<name>，且用户标签优先
+out=$(helm template t . -n llm --set 'kube-prometheus-stack.enabled=true' --set 'kube-prometheus-stack.crds.enabled=false')
+echo "$out" | yq 'select(.kind == "ServiceMonitor" and .metadata.name == "t-llm-helm-deployer") | .metadata.labels.release' \
+  | grep -qx "t" || fail "kps on but ServiceMonitor missing release=t label"
+pass "ServiceMonitor auto release label when kps on"
+
+out=$(helm template t . -n llm --set 'kube-prometheus-stack.enabled=true' --set 'kube-prometheus-stack.crds.enabled=false' --set 'metrics.serviceMonitor.labels.release=foo')
+echo "$out" | yq 'select(.kind == "ServiceMonitor" and .metadata.name == "t-llm-helm-deployer") | .metadata.labels.release' \
+  | grep -qx "foo" || fail "user release label override did not win"
+pass "user release label override wins"
+
 pass "all static tests passed"

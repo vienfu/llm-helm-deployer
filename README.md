@@ -77,6 +77,9 @@ helm test my-llm
 | `metrics.grafanaDashboard.enabled` | false | |
 | `nodeSelector` / `tolerations` / `affinity` | {} / [] / {} | hostPath 模式下务必配置 nodeSelector |
 | `shm.sizeLimit` | 8Gi | `/dev/shm` 大小，TP 大模型需要 |
+| `nvidia-device-plugin.enabled` | false | 是否安装 NVIDIA device plugin DaemonSet |
+| `dcgm-exporter.enabled` | false | 是否安装 dcgm-exporter |
+| `kube-prometheus-stack.enabled` | false | 是否安装 Prometheus Operator + CRDs（含 Grafana/Alertmanager） |
 
 ## 暴露的指标
 
@@ -88,6 +91,8 @@ vLLM 在 `:8000/metrics` 暴露：
 - 等等
 
 GPU 显存等硬件指标由集群侧 dcgm-exporter 提供，例如 `DCGM_FI_DEV_FB_USED`。
+
+> **联动说明：** 当 `kube-prometheus-stack.enabled=true` 时，本 chart 自动给 ServiceMonitor 注入 `release: <release-name>` 标签（kube-prometheus-stack 默认按此筛选 ServiceMonitor）。如果用对接外部已有的 Prometheus Operator，可通过 `metrics.serviceMonitor.labels.release=<your-prom-release>` 覆盖。
 
 ## 已知限制（首版）
 
