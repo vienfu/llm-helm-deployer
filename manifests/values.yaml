@@ -104,6 +104,11 @@ serviceAccount:
 
 nvidia-device-plugin:
   enabled: false
+  # 镜像（如需走私有 registry，取消注释并改写；留空字符串会覆盖 upstream 默认，慎用）
+  # image:
+  #   repository: nvcr.io/nvidia/k8s-device-plugin   # upstream 默认
+  #   tag: ""                                         # 留空跟随子 chart AppVersion
+  #   pullPolicy: IfNotPresent
   # 调度到带 GPU 的节点（NFD 标签）；若集群未装 NFD，请清空 nodeSelector
   nodeSelector:
     feature.node.kubernetes.io/pci-10de.present: "true"
@@ -114,6 +119,11 @@ nvidia-device-plugin:
 
 dcgm-exporter:
   enabled: false
+  # 镜像（如需私有 registry 取消注释）
+  # image:
+  #   repository: nvcr.io/nvidia/k8s/dcgm-exporter   # upstream 默认
+  #   tag: ""                                         # 留空跟随子 chart AppVersion
+  #   pullPolicy: IfNotPresent
   # 调度到 GPU 节点；非 GPU 节点上 dcgm-exporter 会启动失败
   nodeSelector:
     feature.node.kubernetes.io/pci-10de.present: "true"
@@ -126,6 +136,13 @@ dcgm-exporter:
 
 kube-prometheus-stack:
   enabled: false
+  # 此 chart 内置多个组件镜像，需到对应子段下覆盖。整体走私有 registry 的常用路径：
+  #   prometheus.prometheusSpec.image.registry / repository / tag
+  #   grafana.image.registry / repository / tag
+  #   alertmanager.alertmanagerSpec.image.registry / repository / tag
+  #   prometheusOperator.image.registry / repository / tag
+  #   kube-state-metrics.image.registry / repository / tag
+  #   prometheus-node-exporter.image.registry / repository / tag
   # CRDs 必装：本 chart 输出的 ServiceMonitor 依赖之
   crds:
     enabled: true
