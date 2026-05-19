@@ -1,0 +1,57 @@
+tests/helm-static-test.sh
+  8b3e277f03fd32fc 4 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a0c23aec4ad8aa4d10050c8","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":4}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b12b65bf7a62d2d6945ad53208db10c8e9bfba7c",
+  "prompts": {
+    "8b3e277f03fd32fc": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0aa400c4ad8aa4d1004baf",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "tests/helm-static-test.sh": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Single": 4
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a0c23aec4ad8aa4d10050c8",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 4
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "8b3e277f03fd32fc": {
+      "tool": "trae",
+      "conversation_id": "6a0aa400c4ad8aa4d1004baf",
+      "session_id": "6a0aa400c4ad8aa4d1004baf",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
