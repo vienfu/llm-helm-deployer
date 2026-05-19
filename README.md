@@ -18,6 +18,11 @@
 | kube-prometheus-stack（含 Prometheus Operator + CRDs） | 识别 `ServiceMonitor` 并采集指标 | 默认（`kube-prometheus-stack.enabled=false`） | `--set kube-prometheus-stack.enabled=true` |
 
 > 三段子 chart 的所有 values 均可在对应顶层段下透传，例如关闭 grafana：`--set kube-prometheus-stack.grafana.enabled=false`。
+>
+> **如何调子 chart：** 直接在 [`manifests/values.yaml`](./manifests/values.yaml) 同名段下加字段即可（已预置常用项：调度、ServiceMonitor、retention 等）。完整字段见各 upstream values.yaml：
+> - [nvidia-device-plugin](https://github.com/NVIDIA/k8s-device-plugin/blob/main/deployments/helm/nvidia-device-plugin/values.yaml)
+> - [dcgm-exporter](https://github.com/NVIDIA/dcgm-exporter/blob/main/deployment/values.yaml)
+> - [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml)
 
 ## 快速开始
 
