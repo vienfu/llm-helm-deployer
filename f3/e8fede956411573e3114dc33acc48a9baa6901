@@ -1,0 +1,81 @@
+manifests/values.yaml
+  8b3e277f03fd32fc 112-113,129,149-151 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a0c4fe1c4ad8aa4d1005244","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[112,113]},{"Single":129},{"Range":[149,151]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f3e8fede956411573e3114dc33acc48a9baa6901",
+  "prompts": {
+    "8b3e277f03fd32fc": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0aa400c4ad8aa4d1004baf",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "manifests/values.yaml": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              112,
+              113
+            ]
+          },
+          {
+            "Single": 129
+          },
+          {
+            "Range": [
+              149,
+              151
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a0c4fe1c4ad8aa4d1005244",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  112,
+                  113
+                ]
+              },
+              {
+                "Single": 129
+              },
+              {
+                "Range": [
+                  149,
+                  151
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "8b3e277f03fd32fc": {
+      "tool": "trae",
+      "conversation_id": "6a0aa400c4ad8aa4d1004baf",
+      "session_id": "6a0aa400c4ad8aa4d1004baf",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
