@@ -109,6 +109,8 @@ nvidia-device-plugin:
   #   repository: nvcr.io/nvidia/k8s-device-plugin   # upstream 默认
   #   tag: ""                                         # 留空跟随子 chart AppVersion
   #   pullPolicy: IfNotPresent
+  # 私有 registry 凭证；与主 chart 顶层 imagePullSecrets 无关，需单独配置
+  imagePullSecrets: []
   # 调度到带 GPU 的节点（NFD 标签）；若集群未装 NFD，请清空 nodeSelector
   nodeSelector:
     feature.node.kubernetes.io/pci-10de.present: "true"
@@ -124,6 +126,7 @@ dcgm-exporter:
   #   repository: nvcr.io/nvidia/k8s/dcgm-exporter   # upstream 默认
   #   tag: ""                                         # 留空跟随子 chart AppVersion
   #   pullPolicy: IfNotPresent
+  imagePullSecrets: []
   # 调度到 GPU 节点；非 GPU 节点上 dcgm-exporter 会启动失败
   nodeSelector:
     feature.node.kubernetes.io/pci-10de.present: "true"
@@ -143,6 +146,9 @@ kube-prometheus-stack:
   #   prometheusOperator.image.registry / repository / tag
   #   kube-state-metrics.image.registry / repository / tag
   #   prometheus-node-exporter.image.registry / repository / tag
+  # global.imagePullSecrets 会下发给所有子组件
+  global:
+    imagePullSecrets: []
   # CRDs 必装：本 chart 输出的 ServiceMonitor 依赖之
   crds:
     enabled: true
