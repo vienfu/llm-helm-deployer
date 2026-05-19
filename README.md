@@ -39,6 +39,8 @@ helm install my-llm ./manifests \
 
 全栈安装（裸集群，把三个依赖也一起装）：
 
+> ⚠️ 启用 `nvidia-device-plugin.enabled=true` 时**必须**通过 `--namespace` 指定一个非 `default` 的命名空间（这是 nvidia-device-plugin 子 chart 自身的硬约束）。下面示例用 `-n llm --create-namespace`。
+
 ```bash
 helm install my-llm ./manifests -n llm --create-namespace \
   --set model.name=/models/Qwen2.5-7B-Instruct \
