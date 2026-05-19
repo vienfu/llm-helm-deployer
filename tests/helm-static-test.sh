@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CHART_DIR="$(cd "$(dirname "$0")/../manifests" && pwd)"
 cd "$CHART_DIR"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
