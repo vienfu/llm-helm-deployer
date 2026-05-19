@@ -50,6 +50,7 @@ echo "$out" | grep -q "kind: Ingress" || fail "ingress on but not rendered"
 out=$(helm template t . -f ci/default-values.yaml)
 if echo "$out" | grep -q "kind: Ingress"; then fail "ingress off but rendered"; fi
 echo "$out" | grep -q "kind: ServiceMonitor" || fail "ServiceMonitor should default on"
+if echo "$out" | grep -q "grafana_dashboard"; then fail "grafanaDashboard should default off"; fi
 
 # hostPath path/mountPath transparent
 echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.volumes[] | select(.name == "model-store") | .hostPath.path' \
