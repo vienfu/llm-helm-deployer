@@ -15,3 +15,16 @@ sources:
   - https://github.com/vienfu/llm-helm-deployer
 maintainers:
   - name: vienfu
+dependencies:
+  - name: nvidia-device-plugin
+    version: "0.17.0"
+    repository: https://nvidia.github.io/k8s-device-plugin
+    condition: nvidia-device-plugin.enabled
+  - name: dcgm-exporter
+    version: "3.4.2"
+    repository: https://nvidia.github.io/dcgm-exporter/helm-charts
+    condition: dcgm-exporter.enabled
+  - name: kube-prometheus-stack
+    version: "65.0.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: kube-prometheus-stack.enabled

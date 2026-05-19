@@ -1,0 +1,2 @@
+# Helm dependency tarballs；通过 `helm dependency build` 从 Chart.lock 复现
+charts/

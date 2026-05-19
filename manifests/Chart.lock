@@ -1,0 +1,12 @@
+dependencies:
+- name: nvidia-device-plugin
+  repository: https://nvidia.github.io/k8s-device-plugin
+  version: 0.17.0
+- name: dcgm-exporter
+  repository: https://nvidia.github.io/dcgm-exporter/helm-charts
+  version: 3.4.2
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 65.0.0
+digest: sha256:1bb9a82e6e911358977caa83b8600e4787e867e9233ae43368ae601892c0bb34
+generated: "2026-05-19T18:16:35.402374+08:00"

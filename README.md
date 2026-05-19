@@ -7,19 +7,46 @@
 ## 前置依赖
 
 - Kubernetes 集群
-- 已安装 NVIDIA device plugin（节点上能调度 `nvidia.com/gpu`）
-- 已部署 dcgm-exporter DaemonSet（提供 GPU 显存等硬件指标）
-- 已部署 Prometheus Operator（识别 `ServiceMonitor` CRD）
 - 模型权重已经放在某台 GPU 节点的本地目录（首版仅支持 hostPath）
+
+下面三个组件需要存在于集群中。**任选一种方式：**
+
+| 组件 | 作用 | 已部署 → 直接复用 | 未部署 → 由本 chart 一并安装 |
+|------|------|-------------------|------------------------------|
+| NVIDIA device plugin | 让 K8s 能调度 `nvidia.com/gpu` | 默认（`nvidia-device-plugin.enabled=false`） | `--set nvidia-device-plugin.enabled=true` |
+| dcgm-exporter | 暴露 GPU 显存等硬件指标 | 默认（`dcgm-exporter.enabled=false`） | `--set dcgm-exporter.enabled=true` |
+| kube-prometheus-stack（含 Prometheus Operator + CRDs） | 识别 `ServiceMonitor` 并采集指标 | 默认（`kube-prometheus-stack.enabled=false`） | `--set kube-prometheus-stack.enabled=true` |
+
+> 三段子 chart 的所有 values 均可在对应顶层段下透传，例如关闭 grafana：`--set kube-prometheus-stack.grafana.enabled=false`。
 
 ## 快速开始
 
+先拉取依赖（首次或更换版本时执行）：
+
 ```bash
-helm install my-llm . \
+helm dependency update ./manifests
+```
+
+最小安装（假设客户集群已有上面三个组件）：
+
+```bash
+helm install my-llm ./manifests \
   --set model.name=/models/Qwen2.5-7B-Instruct \
   --set model.hostPath.path=/data/models \
   --set vllm.tensorParallelSize=1 \
   --set 'nodeSelector.kubernetes\.io/hostname=gpu-node-1'
+```
+
+全栈安装（裸集群，把三个依赖也一起装）：
+
+```bash
+helm install my-llm ./manifests -n llm --create-namespace \
+  --set model.name=/models/Qwen2.5-7B-Instruct \
+  --set model.hostPath.path=/data/models \
+  --set 'nodeSelector.kubernetes\.io/hostname=gpu-node-1' \
+  --set nvidia-device-plugin.enabled=true \
+  --set dcgm-exporter.enabled=true \
+  --set kube-prometheus-stack.enabled=true
 ```
 
 测试：

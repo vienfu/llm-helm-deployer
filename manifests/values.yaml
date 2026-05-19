@@ -94,3 +94,14 @@ serviceAccount:
   create: true
   name: ""
   annotations: {}
+
+# 可选子 chart：默认全部关闭，假设客户集群已具备这些组件。
+# 开启某项后，可在该段下透传该子 chart 的任意 values。
+nvidia-device-plugin:
+  enabled: false
+
+dcgm-exporter:
+  enabled: false
+
+kube-prometheus-stack:
+  enabled: false
