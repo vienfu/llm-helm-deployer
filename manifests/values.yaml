@@ -50,6 +50,9 @@ resources:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+# Pod 调度器名称；留空则使用 Kubernetes 默认调度器（default-scheduler）。
+# 自定义 GPU/拓扑感知调度器（如 volcano、kai-scheduler、koordinator）时填写其名称。
+schedulerName: ""
 
 probes:
   startup:

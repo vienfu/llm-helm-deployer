@@ -31,6 +31,15 @@ echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.containers
   | grep -q -- "--tensor-parallel-size" || fail "args missing --tensor-parallel-size"
 pass "tp2 sync"
 
+# schedulerName 默认空 → 不渲染；显式设值 → 出现
+out=$(helm template t . -f ci/default-values.yaml)
+sched=$(echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.schedulerName')
+[ "$sched" = "null" ] || fail "schedulerName should be absent by default, got: $sched"
+out=$(helm template t . --set schedulerName=volcano)
+echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.schedulerName' \
+  | grep -qx "volcano" || fail "schedulerName=volcano not rendered"
+pass "schedulerName toggle"
+
 echo "[3/5] auth.apiKey present should produce Secret + env + --api-key; absent should not"
 out=$(helm template t . -f ci/auth-values.yaml)
 echo "$out" | yq 'select(.kind == "Secret")' | grep -q api-key || fail "auth: missing Secret"

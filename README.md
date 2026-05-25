@@ -83,6 +83,7 @@ helm test my-llm
 | `metrics.serviceMonitor.enabled` | true | |
 | `metrics.grafanaDashboard.enabled` | false | |
 | `nodeSelector` / `tolerations` / `affinity` | {} / [] / {} | hostPath 模式下务必配置 nodeSelector |
+| `schedulerName` | "" | Pod 调度器名称，留空走 K8s 默认调度器；可填 `volcano` / `kai-scheduler` 等 |
 | `shm.sizeLimit` | 8Gi | `/dev/shm` 大小，TP 大模型需要 |
 | `nvidia-device-plugin.enabled` | false | 是否安装 NVIDIA device plugin DaemonSet |
 | `dcgm-exporter.enabled` | false | 是否安装 dcgm-exporter |
