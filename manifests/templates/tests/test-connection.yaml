@@ -9,9 +9,13 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   restartPolicy: Never
+  {{- with (include "llm-helm-deployer.imagePullSecrets" .) }}
+  imagePullSecrets:
+    {{- . | nindent 4 }}
+  {{- end }}
   containers:
     - name: curl
-      image: curlimages/curl:8.10.1
+      image: "{{ if and .Values.global .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}curlimages/curl:8.10.1"
       command: ["/bin/sh", "-c"]
       args:
         - |

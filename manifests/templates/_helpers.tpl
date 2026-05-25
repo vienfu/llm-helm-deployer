@@ -66,6 +66,41 @@ servedModelName: 用户填了取用户的；否则取 model.name 的 basename
 {{- end -}}
 
 {{/*
+vLLM 容器完整镜像引用：global.imageRegistry 非空时拼前缀；否则 image.repository 原样使用。
+当 image.repository 已含 '/' 形式的 registry（如 my-reg.io/vllm/vllm-openai）时也兼容（用户自填覆盖）。
+*/}}
+{{- define "llm-helm-deployer.image" -}}
+{{- $reg := "" -}}
+{{- if .Values.global -}}
+{{- $reg = .Values.global.imageRegistry | default "" -}}
+{{- end -}}
+{{- if $reg -}}
+{{- printf "%s/%s:%s" $reg .Values.image.repository .Values.image.tag -}}
+{{- else -}}
+{{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+合并的 imagePullSecrets：主 chart imagePullSecrets + global.imagePullSecrets。
+两处都可填；模板里 union 后输出。
+*/}}
+{{- define "llm-helm-deployer.imagePullSecrets" -}}
+{{- $secrets := list -}}
+{{- range .Values.imagePullSecrets -}}
+{{- $secrets = append $secrets . -}}
+{{- end -}}
+{{- if and .Values.global .Values.global.imagePullSecrets -}}
+{{- range .Values.global.imagePullSecrets -}}
+{{- $secrets = append $secrets . -}}
+{{- end -}}
+{{- end -}}
+{{- if $secrets -}}
+{{- toYaml $secrets -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 拼接 vLLM 启动参数列表（YAML 数组形式）
 */}}
 {{- define "llm-helm-deployer.vllmArgs" -}}

@@ -27,9 +27,9 @@ spec:
       {{- with .Values.schedulerName }}
       schedulerName: {{ . }}
       {{- end }}
-      {{- with .Values.imagePullSecrets }}
+      {{- with (include "llm-helm-deployer.imagePullSecrets" .) }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
@@ -47,7 +47,7 @@ spec:
             sizeLimit: {{ .Values.shm.sizeLimit }}
       containers:
         - name: vllm
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "llm-helm-deployer.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.securityContext }}
           securityContext:

@@ -88,6 +88,51 @@ helm test my-llm
 | `nvidia-device-plugin.enabled` | false | 是否安装 NVIDIA device plugin DaemonSet |
 | `dcgm-exporter.enabled` | false | 是否安装 dcgm-exporter |
 | `kube-prometheus-stack.enabled` | false | 是否安装 Prometheus Operator + CRDs（含 Grafana/Alertmanager） |
+| `global.imageRegistry` | "" | 离线/私有 registry 镜像前缀（详见下方「离线 / 私有 registry 部署」） |
+| `global.imagePullSecrets` | [] | 全局 pull secrets，会与顶层 `imagePullSecrets` 合并 |
+
+## 离线 / 私有 registry 部署
+
+客户集群无法直接访问 dockerhub / nvcr.io / quay.io / registry.k8s.io 时，按下面的步骤把镜像同步到客户内网 registry，再用 `global.imageRegistry` 一次性切换：
+
+### 1. 同步镜像
+
+仓库内置 [`tools/mirror-images.sh`](./tools/mirror-images.sh)，包含主 chart + 三个可选子 chart 的全部镜像清单（与 Chart.lock 锁定的 AppVersion 对齐）：
+
+```bash
+# 仅查看将执行的命令（不实际拉/推）
+DEST_REG=my-reg.io.example/llm DRY_RUN=1 ./tools/mirror-images.sh
+
+# 用 docker（默认）
+DEST_REG=my-reg.io.example/llm ./tools/mirror-images.sh
+
+# 用 skopeo（推荐，无需本地 docker daemon）
+DEST_REG=my-reg.io.example/llm USE_SKOPEO=1 ./tools/mirror-images.sh
+```
+
+镜像被搬运到 `${DEST_REG}/<原 path>:<原 tag>`，路径与 tag 与公网保持一致，便于 `global.imageRegistry` 单点改写。
+
+### 2. 离线安装
+
+```bash
+helm install my-llm ./manifests -n llm --create-namespace \
+  --set global.imageRegistry=my-reg.io.example/llm \
+  --set 'global.imagePullSecrets[0].name=my-pull-secret' \
+  --set model.name=/models/Qwen2.5-7B-Instruct \
+  --set model.hostPath.path=/data/models \
+  --set 'nodeSelector.kubernetes\.io/hostname=gpu-node-1'
+```
+
+### 3. 子 chart 注意事项
+
+| 子 chart | 是否接受 `global.imageRegistry` | 离线场景配置方式 |
+|----------|------------------------------|-----------------|
+| 主 chart（vLLM）| ✅ | 主 chart helper 自动拼前缀 |
+| `kube-prometheus-stack` | ✅ | upstream 原生支持，主 chart `global` 段会自动下发到子 chart |
+| `nvidia-device-plugin` | ❌ | 需显式覆盖 `--set nvidia-device-plugin.image.repository=my-reg.io.example/llm/nvidia/k8s-device-plugin` |
+| `dcgm-exporter` | ❌ | 需显式覆盖 `--set dcgm-exporter.image.repository=my-reg.io.example/llm/nvidia/k8s/dcgm-exporter` |
+
+> 镜像同步脚本结束时会打印对应的 `--set` 命令，可直接复制使用。
 
 ## 暴露的指标
 

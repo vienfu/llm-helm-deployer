@@ -4,6 +4,19 @@ image:
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
+# 离线 / 私有 registry 场景的全局开关：
+# - global.imageRegistry: 非空时会作为前缀拼到所有镜像 repository 之前。
+#     * 主 chart：vLLM 主镜像、helm test curl 镜像
+#     * kube-prometheus-stack：upstream 原生支持，自动接管所有子组件
+#     * nvidia-device-plugin / dcgm-exporter：upstream 不支持 global，需在
+#       各自段下单独 set image.repository（下方注释里有示例）
+# - global.imagePullSecrets: 与主 chart 顶层 imagePullSecrets 合并使用。
+#     kube-prometheus-stack 通过 .Values.kube-prometheus-stack.global.imagePullSecrets
+#     单独透传（已在下方预置）。
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
 nameOverride: ""
 fullnameOverride: ""
 
@@ -108,9 +121,10 @@ serviceAccount:
 nvidia-device-plugin:
   enabled: false
   # 镜像（如需走私有 registry，取消注释并改写；留空字符串会覆盖 upstream 默认，慎用）
+  # 此 chart 不支持 global.imageRegistry，离线场景必须显式覆盖：
   # image:
-  #   repository: nvcr.io/nvidia/k8s-device-plugin   # upstream 默认
-  #   tag: ""                                         # 留空跟随子 chart AppVersion
+  #   repository: my-reg.io/nvidia/k8s-device-plugin   # = global.imageRegistry + 原 nvcr.io 路径片段
+  #   tag: ""                                           # 留空跟随子 chart AppVersion
   #   pullPolicy: IfNotPresent
   # 私有 registry 凭证；与主 chart 顶层 imagePullSecrets 无关，需单独配置
   imagePullSecrets: []
@@ -124,10 +138,10 @@ nvidia-device-plugin:
 
 dcgm-exporter:
   enabled: false
-  # 镜像（如需私有 registry 取消注释）
+  # 镜像（如需私有 registry 取消注释，本 chart 也不支持 global.imageRegistry）
   # image:
-  #   repository: nvcr.io/nvidia/k8s/dcgm-exporter   # upstream 默认
-  #   tag: ""                                         # 留空跟随子 chart AppVersion
+  #   repository: my-reg.io/nvidia/k8s/dcgm-exporter   # = global.imageRegistry + 原 nvcr.io 路径片段
+  #   tag: ""                                           # 留空跟随子 chart AppVersion
   #   pullPolicy: IfNotPresent
   imagePullSecrets: []
   # 调度到 GPU 节点；非 GPU 节点上 dcgm-exporter 会启动失败
@@ -142,16 +156,17 @@ dcgm-exporter:
 
 kube-prometheus-stack:
   enabled: false
-  # 此 chart 内置多个组件镜像，需到对应子段下覆盖。整体走私有 registry 的常用路径：
+  # 镜像 registry：本 chart 原生支持 .Values.global.imageRegistry，
+  # 主 chart 顶层 global 段会自动下发到此处（前提：本段下不要再显式写 global:），
+  # 因此设主 chart 的 global.imageRegistry 即可一并接管 kps 内所有子组件镜像。
+  #
+  # 单独覆盖某组件镜像示例：
   #   prometheus.prometheusSpec.image.registry / repository / tag
   #   grafana.image.registry / repository / tag
   #   alertmanager.alertmanagerSpec.image.registry / repository / tag
   #   prometheusOperator.image.registry / repository / tag
   #   kube-state-metrics.image.registry / repository / tag
   #   prometheus-node-exporter.image.registry / repository / tag
-  # global.imagePullSecrets 会下发给所有子组件
-  global:
-    imagePullSecrets: []
   # CRDs 必装：本 chart 输出的 ServiceMonitor 依赖之
   crds:
     enabled: true
