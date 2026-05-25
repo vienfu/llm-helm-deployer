@@ -1,0 +1,20 @@
+# 镜像清单：方案 B（mirror-images.sh）与方案 C（build-bundle.sh）共享。
+# 一行一个镜像，含 registry/path:tag。'#' 开头为注释，空行忽略。
+# 升级子 chart 版本时同步更新此文件。
+
+# 主 chart
+docker.io/vllm/vllm-openai:v0.6.3
+docker.io/curlimages/curl:8.10.1
+
+# nvidia-device-plugin 0.17.0 (AppVersion 对齐)
+nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+
+# dcgm-exporter 3.4.2 (AppVersion 对齐)
+nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04
+
+# kube-prometheus-stack 65.0.0 (子组件 AppVersion 与上游 values 对齐)
+quay.io/prometheus/prometheus:v2.54.1
+docker.io/grafana/grafana:11.2.2
+quay.io/prometheus-operator/prometheus-operator:v0.77.1
+registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
+quay.io/prometheus/node-exporter:v1.8.2
