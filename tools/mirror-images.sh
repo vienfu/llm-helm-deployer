@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# 镜像同步脚本：把本 chart（含可选子 chart）依赖的所有公网镜像
-# 镜像同步到客户私有 registry，用于离线/内网部署场景。
+# 镜像同步脚本：把本 chart（含可选子 chart）依赖的所有镜像同步到客户私有 registry。
+# 支持两种源：
+#   1) 默认（公网）：从公网 registry 拉取后推到客户 registry。
+#   2) FROM_DIR=<dir>：从 docker-archive tar 文件目录推到客户 registry，
+#      用于方案 C 离线 bundle 解压后跑（无需访问公网）。
 #
 # 用法（密码强制从 stdin 读取，绝不通过 env / 命令行传入）：
 #
+#   # === 在线模式（方案 B）===
 #   # 交互式：脚本会提示「请输入镜像仓库密码:」
 #   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot \
 #       ./tools/mirror-images.sh
@@ -23,11 +27,19 @@
 #   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot USE_SKOPEO=1 \
 #       ./tools/mirror-images.sh
 #
+#   # === 离线模式（方案 C）===
+#   # 解压 bundle 后在 bundle 目录下执行：
+#   FROM_DIR=./images USE_SKOPEO=1 \
+#   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot \
+#       ./tools/mirror-images.sh
+#
 # 环境变量：
 #   DEST_REG         目标 registry 前缀（必填，如 my-reg.io/llm）
 #   DEST_USER        目标 registry 用户名；非空则强制从 stdin 读取密码
 #   DEST_TLS_VERIFY  设为 false 时跳过证书校验（自签 / HTTP 私有仓库）
-#   SRC_USER         源 registry 用户名（仅当源镜像需要鉴权时，如 nvcr.io NGC API Key）；
+#   FROM_DIR         指定 docker-archive 目录（含 manifest.json），离线 bundle 模式
+#   IMAGES_LIST      镜像清单文件路径（默认 tools/images.list，与脚本同目录）
+#   SRC_USER         源 registry 用户名（仅在线模式 + 源镜像需要鉴权时，如 nvcr.io NGC API Key）；
 #                    非空则强制从 stdin 读取源 registry 密码
 #   USE_SKOPEO       设为 1 用 skopeo copy（推荐）；否则 docker pull/tag/push
 #   DRY_RUN          设为 1 仅打印命令，不执行
@@ -41,6 +53,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+IMAGES_LIST="${IMAGES_LIST:-${SCRIPT_DIR}/images.list}"
+
 if [ -z "${DEST_REG:-}" ]; then
   echo "ERROR: DEST_REG is required, e.g. DEST_REG=my-reg.io.example/llm $0" >&2
   exit 2
@@ -48,6 +63,16 @@ fi
 
 # 取 DEST_REG 中的 host 段（首个 '/' 之前）作为 registry 主机
 DEST_HOST="${DEST_REG%%/*}"
+
+# === FROM_DIR 模式校验 ===
+FROM_DIR="${FROM_DIR:-}"
+if [ -n "${FROM_DIR}" ]; then
+  [ -d "${FROM_DIR}" ] || { echo "ERROR: FROM_DIR=${FROM_DIR} 不存在" >&2; exit 2; }
+  if [ -n "${SRC_USER:-}" ]; then
+    echo "WARN: FROM_DIR 模式忽略 SRC_USER（无源 registry 鉴权）" >&2
+    SRC_USER=""
+  fi
+fi
 
 # 强制从 stdin 读取密码，不接受任何 env / 参数注入
 # - tty 模式：先打印提示语到 stderr（不污染 stdout），再 read -rs 不回显
@@ -87,27 +112,16 @@ if [ -n "${SRC_USER:-}" ]; then
   fi
 fi
 
-# 镜像清单：(<source>) 一行一个
-# 主 chart：vLLM 推理镜像 + helm test curl 探针
-# 子 chart：从各 chart 默认 values 抓取（与 Chart.lock 锁定的 AppVersion 对齐）
-IMAGES=(
-  # 主 chart
-  "docker.io/vllm/vllm-openai:v0.6.3"
-  "docker.io/curlimages/curl:8.10.1"
-
-  # nvidia-device-plugin 0.17.0 (AppVersion 对齐)
-  "nvcr.io/nvidia/k8s-device-plugin:v0.17.0"
-
-  # dcgm-exporter 3.4.2 (AppVersion 对齐)
-  "nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04"
-
-  # kube-prometheus-stack 65.0.0 (子组件 AppVersion 与上游 values 对齐)
-  "quay.io/prometheus/prometheus:v2.54.1"
-  "docker.io/grafana/grafana:11.2.2"
-  "quay.io/prometheus-operator/prometheus-operator:v0.77.1"
-  "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0"
-  "quay.io/prometheus/node-exporter:v1.8.2"
-)
+# === 加载镜像清单 ===
+# 优先：IMAGES_LIST 文件（'#' 注释 + 空行忽略）
+# 与 build-bundle.sh 共用同一份 images.list，避免漂移
+[ -f "${IMAGES_LIST}" ] || { echo "ERROR: images list not found: ${IMAGES_LIST}" >&2; exit 2; }
+# 用 while read 兼容 macOS 自带 bash 3.2（无 mapfile）
+IMAGES=()
+while IFS= read -r line; do
+  [ -n "${line}" ] && IMAGES+=("${line}")
+done < <(grep -vE '^[[:space:]]*(#|$)' "${IMAGES_LIST}" | awk '{$1=$1;print}')
+[ ${#IMAGES[@]} -gt 0 ] || { echo "ERROR: no images parsed from ${IMAGES_LIST}" >&2; exit 4; }
 
 run() {
   if [ "${DRY_RUN:-0}" = "1" ]; then
@@ -124,6 +138,27 @@ strip_host() {
   local img="$1"
   # 去掉首段 host（含 ':' 或第一个 '/'）
   echo "${img#*/}"
+}
+
+# 与 build-bundle.sh 保持一致的 tar 文件名规则
+# 镜像 ref → 安全文件名: 全部小写、'/'→'-'、':'→'-'
+safe_name() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | tr '/:' '--'
+}
+
+# FROM_DIR 模式：根据镜像 ref 找到对应的 tar 文件
+# 优先读 manifest.json（精确映射），回退到 safe_name 规则
+resolve_archive() {
+  local ref="$1"
+  if [ -f "${FROM_DIR}/manifest.json" ] && command -v jq >/dev/null 2>&1; then
+    local file
+    file=$(jq -r --arg ref "${ref}" '.images[] | select(.ref == $ref) | .file' "${FROM_DIR}/manifest.json")
+    if [ -n "${file}" ] && [ "${file}" != "null" ]; then
+      echo "${FROM_DIR}/${file}"
+      return
+    fi
+  fi
+  echo "${FROM_DIR}/$(safe_name "${ref}").tar"
 }
 
 # === 鉴权：docker 模式 ===
@@ -178,6 +213,13 @@ skopeo_src_args() {
   echo "${args}"
 }
 
+# === 主流程 ===
+if [ -n "${FROM_DIR}" ]; then
+  echo "==> 离线模式 (FROM_DIR=${FROM_DIR})"
+else
+  echo "==> 在线模式（从公网 registry 拉取）"
+fi
+
 if [ "${USE_SKOPEO:-0}" = "1" ]; then
   command -v skopeo >/dev/null || { echo "ERROR: skopeo not installed" >&2; exit 3; }
   src_args="$(skopeo_src_args)"
@@ -185,7 +227,14 @@ if [ "${USE_SKOPEO:-0}" = "1" ]; then
   for src in "${IMAGES[@]}"; do
     dst_path=$(strip_host "$src")
     dst="${DEST_REG}/${dst_path}"
-    run "skopeo copy --all ${src_args} ${dst_args} docker://${src} docker://${dst}"
+    if [ -n "${FROM_DIR}" ]; then
+      archive="$(resolve_archive "${src}")"
+      [ -f "${archive}" ] || { echo "ERROR: archive not found: ${archive}" >&2; exit 5; }
+      # docker-archive 单 tag 输入；--src-creds 在 archive 模式无意义，故省略
+      run "skopeo copy ${dst_args} docker-archive:${archive} docker://${dst}"
+    else
+      run "skopeo copy --all ${src_args} ${dst_args} docker://${src} docker://${dst}"
+    fi
   done
 else
   command -v docker >/dev/null || { echo "ERROR: docker not installed (or set USE_SKOPEO=1)" >&2; exit 3; }
@@ -197,9 +246,18 @@ else
   for src in "${IMAGES[@]}"; do
     dst_path=$(strip_host "$src")
     dst="${DEST_REG}/${dst_path}"
-    run "docker pull ${src}"
-    run "docker tag ${src} ${dst}"
-    run "docker push ${dst}"
+    if [ -n "${FROM_DIR}" ]; then
+      archive="$(resolve_archive "${src}")"
+      [ -f "${archive}" ] || { echo "ERROR: archive not found: ${archive}" >&2; exit 5; }
+      # docker load 后 image 仍以原 ref 出现在本地，再 tag + push
+      run "docker load -i ${archive}"
+      run "docker tag ${src} ${dst}"
+      run "docker push ${dst}"
+    else
+      run "docker pull ${src}"
+      run "docker tag ${src} ${dst}"
+      run "docker push ${dst}"
+    fi
   done
 fi
 
