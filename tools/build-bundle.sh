@@ -11,7 +11,7 @@
 #   │   ├── mirror-images.sh
 #   │   ├── preflight-check.sh
 #   │   └── images.list
-#   ├── install.sh                    (TODO 二期)
+#   ├── install.sh                    (一键入口)
 #   ├── values-bundle-example.yaml
 #   ├── README-OFFLINE.md
 #   └── SHA256SUMS
@@ -149,7 +149,8 @@ echo "==> [4/5] copy tools & docs"
 cp "${SCRIPT_DIR}/mirror-images.sh"   "${BUILD_DIR}/tools/"
 cp "${SCRIPT_DIR}/preflight-check.sh" "${BUILD_DIR}/tools/"
 cp "${SCRIPT_DIR}/images.list"        "${BUILD_DIR}/tools/"
-chmod +x "${BUILD_DIR}/tools/"*.sh
+cp "${SCRIPT_DIR}/install.sh"         "${BUILD_DIR}/install.sh"
+chmod +x "${BUILD_DIR}/tools/"*.sh "${BUILD_DIR}/install.sh"
 
 # 可选：附带 README/example（不存在则跳过，不报错）
 [ -f "${REPO_ROOT}/README-OFFLINE.md" ] && cp "${REPO_ROOT}/README-OFFLINE.md" "${BUILD_DIR}/"
