@@ -239,8 +239,8 @@ helm_args=(
 if [ "${CREATE_PULL_SECRET}" -eq 1 ] && [ -n "${DEST_USER}" ]; then
   helm_args+=("--set" "global.imagePullSecrets[0].name=${PULL_SECRET}")
 fi
-for f in "${EXTRA_VALUES[@]}"; do helm_args+=("-f" "${f}"); done
-for kv in "${EXTRA_SETS[@]}"; do helm_args+=("--set" "${kv}"); done
+for f in ${EXTRA_VALUES[@]+"${EXTRA_VALUES[@]}"}; do helm_args+=("-f" "${f}"); done
+for kv in ${EXTRA_SETS[@]+"${EXTRA_SETS[@]}"}; do helm_args+=("--set" "${kv}"); done
 
 if [ "${DRY_RUN}" -eq 1 ]; then
   echo "[DRY] helm ${helm_args[*]}"

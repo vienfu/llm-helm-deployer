@@ -93,6 +93,8 @@ helm test my-llm
 
 ## 离线 / 私有 registry 部署
 
+> 完全无公网出口、希望发一个物料包给客户的场景，请直接看 [README-OFFLINE.md](./README-OFFLINE.md)（方案 C：完整 bundle，含 chart + 镜像 tar + 一键 install.sh）。本节描述方案 B：仅做 registry 重写。
+
 客户集群无法直接访问 dockerhub / nvcr.io / quay.io / registry.k8s.io 时，按下面的步骤把镜像同步到客户内网 registry，再用 `global.imageRegistry` 一次性切换：
 
 ### 1. 同步镜像
