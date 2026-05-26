@@ -18,7 +18,14 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.podAnnotations }}
+      {{- $extraAnnotations := dict }}
+      {{- if .Values.metrics.serviceMonitor.enabled }}
+      {{- $_ := set $extraAnnotations "prometheus.io/scrape" "true" }}
+      {{- $_ := set $extraAnnotations "prometheus.io/port" (printf "%v" .Values.vllm.port) }}
+      {{- $_ := set $extraAnnotations "prometheus.io/path" "/metrics" }}
+      {{- end }}
+      {{- $allAnnotations := merge (.Values.podAnnotations | default dict) $extraAnnotations }}
+      {{- with $allAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}

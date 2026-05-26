@@ -1,18 +1,16 @@
 image:
   repository: vllm/vllm-openai
-  tag: v0.6.3
+  tag: v0.20.0-cu130-ubuntu2404
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
 # 离线 / 私有 registry 场景的全局开关：
 # - global.imageRegistry: 非空时会作为前缀拼到所有镜像 repository 之前。
 #     * 主 chart：vLLM 主镜像、helm test curl 镜像
-#     * kube-prometheus-stack：upstream 原生支持，自动接管所有子组件
+#     * prometheus：upstream 不支持 global，需在 prometheus.server.image.repository 单独覆盖
 #     * nvidia-device-plugin / dcgm-exporter：upstream 不支持 global，需在
 #       各自段下单独 set image.repository（下方注释里有示例）
 # - global.imagePullSecrets: 与主 chart 顶层 imagePullSecrets 合并使用。
-#     kube-prometheus-stack 通过 .Values.kube-prometheus-stack.global.imagePullSecrets
-#     单独透传（已在下方预置）。
 global:
   imageRegistry: ""
   imagePullSecrets: []
@@ -58,14 +56,17 @@ ingress:
 
 resources:
   limits:
-    nvidia.com/gpu: 1   # 模板会自动用 vllm.tensorParallelSize 覆盖
+    # nvidia.com/gpu: 1   # 模板会自动用 vllm.tensorParallelSize 覆盖
+    volcano.sh/vgpu-number: "1"
+    cpu: "20"
+    memory: "100Gi"
   requests: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
 # Pod 调度器名称；留空则使用 Kubernetes 默认调度器（default-scheduler）。
 # 自定义 GPU/拓扑感知调度器（如 volcano、kai-scheduler、koordinator）时填写其名称。
-schedulerName: ""
+schedulerName: "volcano"
 
 probes:
   startup:
@@ -90,7 +91,11 @@ probes:
 
 metrics:
   serviceMonitor:
+    # 字段名沿用旧称（语义：是否被监控栈抓取），保持向后兼容。
+    # 启用后会在 vLLM Pod 注入 prometheus.io/scrape=true 等 annotation，
+    # 由 prometheus 子 chart（或外部 Prometheus）通过 kubernetes_sd 自动发现。
     enabled: true
+    # 以下字段仅在外部 ServiceMonitor 场景下有意义，本 chart 已不再渲染 ServiceMonitor。
     interval: 15s
     labels: {}
     relabelings: []
@@ -154,30 +159,59 @@ dcgm-exporter:
   serviceMonitor:
     enabled: true
 
-kube-prometheus-stack:
+prometheus:
   enabled: false
-  # 镜像 registry：本 chart 原生支持 .Values.global.imageRegistry，
-  # 主 chart 顶层 global 段会自动下发到此处（前提：本段下不要再显式写 global:），
-  # 因此设主 chart 的 global.imageRegistry 即可一并接管 kps 内所有子组件镜像。
-  #
-  # 单独覆盖某组件镜像示例：
-  #   prometheus.prometheusSpec.image.registry / repository / tag
-  #   grafana.image.registry / repository / tag
-  #   alertmanager.alertmanagerSpec.image.registry / repository / tag
-  #   prometheusOperator.image.registry / repository / tag
-  #   kube-state-metrics.image.registry / repository / tag
-  #   prometheus-node-exporter.image.registry / repository / tag
-  # CRDs 必装：本 chart 输出的 ServiceMonitor 依赖之
-  crds:
-    enabled: true
+  # 单实例 Prometheus（prometheus-community/prometheus 25.27.0）。
+  # 已关闭 alertmanager / pushgateway / node-exporter / kube-state-metrics，
+  # 只保留 prometheus-server，配合 annotation-based scrape 抓取 vLLM Pod。
   alertmanager:
     enabled: false
-  grafana:
-    enabled: true
-    # 必须 --set kube-prometheus-stack.grafana.adminPassword=... 覆盖
-    adminPassword: ""
-  prometheus:
-    prometheusSpec:
-      retention: 15d
-      # 让 Prometheus 抓取所有 ServiceMonitor，避免 release label 不匹配漏抓
-      serviceMonitorSelectorNilUsesHelmValues: false
+  prometheus-pushgateway:
+    enabled: false
+  prometheus-node-exporter:
+    enabled: false
+  kube-state-metrics:
+    enabled: false
+  server:
+    image:
+      repository: quay.io/prometheus/prometheus
+      tag: v3.11.3
+    persistentVolume:
+      # 默认使用 emptyDir（Pod 重启数据丢失）；生产场景建议设为 true。
+      enabled: false
+      size: 20Gi
+      storageClass: ""
+    retention: "7d"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+    # 抓取 vLLM Pod：依赖 Pod 上的 prometheus.io/scrape=true 等 annotation
+    # （主 chart deployment.yaml 在 metrics.serviceMonitor.enabled=true 时自动注入）。
+    # 注意：此字段被用户覆盖时会整体替换默认配置，请复制后追加而不是直接替换。
+    extraScrapeConfigs: |
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
