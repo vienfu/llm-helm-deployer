@@ -12,7 +12,7 @@ nvcr.io/nvidia/k8s-device-plugin:v0.17.0
 # dcgm-exporter 3.4.2 (AppVersion 对齐)
 nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04
 
-# prometheus 25.27.0 (单实例 Prometheus，annotation-based scrape)
+# prometheus 29.8.0 (单实例 Prometheus，annotation-based scrape)
 # server 主镜像 + sidecar config-reloader（chart 默认注入，离线场景必须同步）
 quay.io/prometheus/prometheus:v3.11.3
-quay.io/prometheus-operator/prometheus-config-reloader:v0.76.0
+quay.io/prometheus-operator/prometheus-config-reloader:v0.91.0

@@ -161,7 +161,7 @@ dcgm-exporter:
 
 prometheus:
   enabled: false
-  # 单实例 Prometheus（prometheus-community/prometheus 25.27.0）。
+  # 单实例 Prometheus（prometheus-community/prometheus 29.8.0，appVersion v3.11.3）。
   # 已关闭 alertmanager / pushgateway / node-exporter / kube-state-metrics，
   # 只保留 prometheus-server，配合 annotation-based scrape 抓取 vLLM Pod。
   alertmanager:
