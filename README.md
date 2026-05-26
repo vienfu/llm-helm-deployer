@@ -15,14 +15,14 @@
 |------|------|-------------------|------------------------------|
 | NVIDIA device plugin | 让 K8s 能调度 `nvidia.com/gpu` | 默认（`nvidia-device-plugin.enabled=false`） | `--set nvidia-device-plugin.enabled=true` |
 | dcgm-exporter | 暴露 GPU 显存等硬件指标 | 默认（`dcgm-exporter.enabled=false`） | `--set dcgm-exporter.enabled=true` |
-| kube-prometheus-stack（含 Prometheus Operator + CRDs） | 识别 `ServiceMonitor` 并采集指标 | 默认（`kube-prometheus-stack.enabled=false`） | `--set kube-prometheus-stack.enabled=true` |
+| Prometheus（单实例） | 抓取 vLLM Pod 指标（annotation-based） | 默认（`prometheus.enabled=false`） | `--set prometheus.enabled=true` |
 
-> 三段子 chart 的所有 values 均可在对应顶层段下透传，例如关闭 grafana：`--set kube-prometheus-stack.grafana.enabled=false`。
+> 三段子 chart 的所有 values 均可在对应顶层段下透传，例如调小 prometheus 保留期：`--set prometheus.server.retention=3d`。
 >
-> **如何调子 chart：** 直接在 [`manifests/values.yaml`](./manifests/values.yaml) 同名段下加字段即可（已预置常用项：调度、ServiceMonitor、retention 等）。完整字段见各 upstream values.yaml：
+> **如何调子 chart：** 直接在 [`manifests/values.yaml`](./manifests/values.yaml) 同名段下加字段即可（已预置常用项：调度、scrape annotation、retention 等）。完整字段见各 upstream values.yaml：
 > - [nvidia-device-plugin](https://github.com/NVIDIA/k8s-device-plugin/blob/main/deployments/helm/nvidia-device-plugin/values.yaml)
 > - [dcgm-exporter](https://github.com/NVIDIA/dcgm-exporter/blob/main/deployment/values.yaml)
-> - [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml)
+> - [prometheus](https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus/values.yaml)
 
 ## 快速开始
 
@@ -53,7 +53,7 @@ helm install my-llm ./manifests -n llm --create-namespace \
   --set 'nodeSelector.kubernetes\.io/hostname=gpu-node-1' \
   --set nvidia-device-plugin.enabled=true \
   --set dcgm-exporter.enabled=true \
-  --set kube-prometheus-stack.enabled=true
+  --set prometheus.enabled=true
 ```
 
 测试：
@@ -80,14 +80,14 @@ helm test my-llm
 | `auth.apiKey` | "" | 非空则启用 OpenAI 风格 Bearer 鉴权 |
 | `service.type` | ClusterIP | |
 | `ingress.enabled` | false | |
-| `metrics.serviceMonitor.enabled` | true | |
+| `metrics.serviceMonitor.enabled` | true | 是否给 vLLM Pod 注入 `prometheus.io/scrape` annotation（字段名沿用旧称以保留向后兼容；不再渲染 ServiceMonitor） |
 | `metrics.grafanaDashboard.enabled` | false | |
 | `nodeSelector` / `tolerations` / `affinity` | {} / [] / {} | hostPath 模式下务必配置 nodeSelector |
 | `schedulerName` | "" | Pod 调度器名称，留空走 K8s 默认调度器；可填 `volcano` / `kai-scheduler` 等 |
 | `shm.sizeLimit` | 8Gi | `/dev/shm` 大小，TP 大模型需要 |
 | `nvidia-device-plugin.enabled` | false | 是否安装 NVIDIA device plugin DaemonSet |
 | `dcgm-exporter.enabled` | false | 是否安装 dcgm-exporter |
-| `kube-prometheus-stack.enabled` | false | 是否安装 Prometheus Operator + CRDs（含 Grafana/Alertmanager） |
+| `prometheus.enabled` | false | 是否安装单实例 Prometheus（基于 prometheus-community/prometheus，关闭 alertmanager/pushgateway/node-exporter/kube-state-metrics） |
 | `global.imageRegistry` | "" | 离线/私有 registry 镜像前缀（详见下方「离线 / 私有 registry 部署」） |
 | `global.imagePullSecrets` | [] | 全局 pull secrets，会与顶层 `imagePullSecrets` 合并 |
 
@@ -130,7 +130,7 @@ helm install my-llm ./manifests -n llm --create-namespace \
 | 子 chart | 是否接受 `global.imageRegistry` | 离线场景配置方式 |
 |----------|------------------------------|-----------------|
 | 主 chart（vLLM）| ✅ | 主 chart helper 自动拼前缀 |
-| `kube-prometheus-stack` | ✅ | upstream 原生支持，主 chart `global` 段会自动下发到子 chart |
+| `prometheus` | ❌ | 需显式覆盖 `--set prometheus.server.image.repository=my-reg.io.example/llm/prometheus/prometheus` 以及 `--set prometheus.server.configmapReload.prometheus.image.repository=my-reg.io.example/llm/prometheus-operator/prometheus-config-reloader` |
 | `nvidia-device-plugin` | ❌ | 需显式覆盖 `--set nvidia-device-plugin.image.repository=my-reg.io.example/llm/nvidia/k8s-device-plugin` |
 | `dcgm-exporter` | ❌ | 需显式覆盖 `--set dcgm-exporter.image.repository=my-reg.io.example/llm/nvidia/k8s/dcgm-exporter` |
 
@@ -147,7 +147,30 @@ vLLM 在 `:8000/metrics` 暴露：
 
 GPU 显存等硬件指标由集群侧 dcgm-exporter 提供，例如 `DCGM_FI_DEV_FB_USED`。
 
-> **联动说明：** 当 `kube-prometheus-stack.enabled=true` 时，本 chart 自动给 ServiceMonitor 注入 `release: <release-name>` 标签（kube-prometheus-stack 默认按此筛选 ServiceMonitor）。如果用对接外部已有的 Prometheus Operator，可通过 `metrics.serviceMonitor.labels.release=<your-prom-release>` 覆盖。
+> **联动说明：** 当 `metrics.serviceMonitor.enabled=true`（默认）时，本 chart 会给 vLLM Pod 注入 `prometheus.io/scrape=true` / `prometheus.io/port=<vllm.port>` / `prometheus.io/path=/metrics` 三个 annotation。本仓库内置的单实例 Prometheus（`prometheus.enabled=true`）通过 `kubernetes_sd_configs` + `__meta_kubernetes_pod_annotation_*` 自动发现并抓取。如对接外部已有的 Prometheus / Prometheus Operator，可在外部配置同样的 annotation 抓取规则；也可关闭本字段后改用自定义 ServiceMonitor / PodMonitor。
+
+## 已有 kube-prometheus-stack 用户升级路径
+
+> 本 chart 在 v0.x 以前依赖 `kube-prometheus-stack`，自本次重构起改为 `prometheus`（单实例）。如你之前以 `--set kube-prometheus-stack.enabled=true` 安装过，请按以下步骤迁移：
+
+```bash
+# 1. 先 helm upgrade 到新版本（kube-prometheus-stack 子 chart 已被移除，原 release 中相应 workloads 会被一起卸载）
+helm upgrade my-llm ./manifests -n llm \
+  --set prometheus.enabled=true   # 如需保留监控
+
+# 2. 手动清理 kube-prometheus-stack 留下的 CRD（Helm v3 默认不删 CRD）
+kubectl delete crd \
+  alertmanagerconfigs.monitoring.coreos.com \
+  alertmanagers.monitoring.coreos.com \
+  podmonitors.monitoring.coreos.com \
+  probes.monitoring.coreos.com \
+  prometheuses.monitoring.coreos.com \
+  prometheusrules.monitoring.coreos.com \
+  servicemonitors.monitoring.coreos.com \
+  thanosrulers.monitoring.coreos.com
+```
+
+> 如继续需要 Operator 风格（ServiceMonitor / PodMonitor / Alertmanager / Grafana 全家桶），请独立安装 kube-prometheus-stack（不再由本 chart 托管），并在外部配置同样的 annotation 抓取或 PodMonitor 规则。
 
 ## 已知限制（首版）
 

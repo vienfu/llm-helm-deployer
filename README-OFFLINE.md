@@ -64,7 +64,7 @@ cd llm-deployer-bundle-<ver>
 | # | 步骤 | 跳过开关 | 说明 |
 |---|------|----------|------|
 | 1 | SHA256SUMS 校验 | `--skip-sha` | 防止传输损坏 |
-| 2 | 集群预检 | `--skip-preflight` | GPU 节点 + ServiceMonitor CRD |
+| 2 | 集群预检 | `--skip-preflight` | GPU 节点检测；如客户集群未装 ServiceMonitor CRD 可加 `--skip-sm` 跳过历史检查（本 chart 已不再依赖 ServiceMonitor，改为 annotation-based scrape） |
 | 3 | 镜像同步 | `--skip-mirror` | `mirror-images.sh FROM_DIR=./images` |
 | 4 | 创建 imagePullSecret | 默认关闭，`--create-pull-secret` 启用 | dockerconfigjson 类型 |
 | 5 | `helm upgrade --install` | （无） | 自动注入 `global.imageRegistry` |
@@ -103,10 +103,12 @@ helm upgrade --install my-llm ./chart/llm-helm-deployer-*.tgz \
 
 - **架构**：`build-bundle.sh` 默认 `--override-arch amd64`，arm64 集群需自行重打。
 - **不含模型权重**：模型仍走 `model.hostPath`，需另行将权重目录拷到 GPU 节点（详见主 [README.md](./README.md) 的「模型权重」一节）。
-- **子 chart 镜像覆盖**：`nvidia-device-plugin` / `dcgm-exporter` 不识别 `global.imageRegistry`，需在 `install.sh` 后追加：
+- **子 chart 镜像覆盖**：`nvidia-device-plugin` / `dcgm-exporter` / `prometheus` 均不识别 `global.imageRegistry`，需在 `install.sh` 后追加：
   ```
   --set 'nvidia-device-plugin.image.repository=my-reg.io.example/llm/nvidia/k8s-device-plugin' \
-  --set 'dcgm-exporter.image.repository=my-reg.io.example/llm/nvidia/k8s/dcgm-exporter'
+  --set 'dcgm-exporter.image.repository=my-reg.io.example/llm/nvidia/k8s/dcgm-exporter' \
+  --set 'prometheus.server.image.repository=my-reg.io.example/llm/prometheus/prometheus' \
+  --set 'prometheus.server.configmapReload.prometheus.image.repository=my-reg.io.example/llm/prometheus-operator/prometheus-config-reloader'
   ```
 - **TLS 自签**：客户 registry 用自签证书时，`install.sh --dest-tls-verify false`（仅 skopeo 模式生效；docker 模式需先在 daemon 配 `insecure-registries`）。
 - **可重入**：`install.sh` 全程基于 `helm upgrade --install` 与 `kubectl apply`，可重复执行；镜像同步阶段也可单独重跑（`tools/mirror-images.sh` + `FROM_DIR=./images`）。
