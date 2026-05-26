@@ -1,0 +1,154 @@
+README.md
+  8b3e277f03fd32fc 18,20,22,25,56,83,90,133,150-173 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a156808c4ad8aa4d10059d4","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":18},{"Single":20},{"Single":22},{"Single":25},{"Single":56},{"Single":83},{"Single":90},{"Single":133},{"Range":[150,173]}]}]}
+README-OFFLINE.md
+  8b3e277f03fd32fc 67,106,109-111 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a156808c4ad8aa4d10059d4","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":67},{"Single":106},{"Range":[109,111]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "c4a8899f0800d0613b269a35f6344952ae204e3d",
+  "prompts": {
+    "8b3e277f03fd32fc": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0aa400c4ad8aa4d1004baf",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 12,
+      "accepted_lines": 258,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "README-OFFLINE.md": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Single": 67
+          },
+          {
+            "Single": 106
+          },
+          {
+            "Range": [
+              109,
+              111
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a156808c4ad8aa4d10059d4",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 67
+              },
+              {
+                "Single": 106
+              },
+              {
+                "Range": [
+                  109,
+                  111
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "README.md": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Single": 18
+          },
+          {
+            "Single": 20
+          },
+          {
+            "Single": 22
+          },
+          {
+            "Single": 25
+          },
+          {
+            "Single": 56
+          },
+          {
+            "Single": 83
+          },
+          {
+            "Single": 90
+          },
+          {
+            "Single": 133
+          },
+          {
+            "Range": [
+              150,
+              173
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a156808c4ad8aa4d10059d4",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 18
+              },
+              {
+                "Single": 20
+              },
+              {
+                "Single": 22
+              },
+              {
+                "Single": 25
+              },
+              {
+                "Single": 56
+              },
+              {
+                "Single": 83
+              },
+              {
+                "Single": 90
+              },
+              {
+                "Single": 133
+              },
+              {
+                "Range": [
+                  150,
+                  173
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "8b3e277f03fd32fc": {
+      "tool": "trae",
+      "conversation_id": "6a0aa400c4ad8aa4d1004baf",
+      "session_id": "6a0aa400c4ad8aa4d1004baf",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
