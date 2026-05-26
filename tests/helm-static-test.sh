@@ -57,15 +57,30 @@ echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.containers
   | grep -q -- "--api-key" && fail "auth off but --api-key rendered"
 pass "auth off"
 
-echo "[4/6] ingress + servicemonitor toggles"
+echo "[4/6] ingress + scrape annotation toggles"
 out=$(helm template t . -f ci/ingress-values.yaml)
 echo "$out" | grep -q "kind: Ingress" || fail "ingress on but not rendered"
 out=$(helm template t . -f ci/default-values.yaml)
 if echo "$out" | grep -q "kind: Ingress"; then fail "ingress off but rendered"; fi
-echo "$out" | grep -q "kind: ServiceMonitor" || fail "ServiceMonitor should default on"
+# 监控接入方式已从 ServiceMonitor 改为 Pod annotation；不应再渲染 ServiceMonitor
+if echo "$out" | grep -q "kind: ServiceMonitor"; then fail "ServiceMonitor should never be rendered after monitor-simplify"; fi
+echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.metadata.annotations."prometheus.io/scrape"' \
+  | grep -qx "true" || fail "prometheus.io/scrape=true should default on"
+echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.metadata.annotations."prometheus.io/port"' \
+  | grep -qx "8000" || fail "prometheus.io/port should match vllm.port"
+echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.metadata.annotations."prometheus.io/path"' \
+  | grep -qx "/metrics" || fail "prometheus.io/path should be /metrics"
 if echo "$out" | grep -q "grafana_dashboard"; then fail "grafanaDashboard should default off"; fi
 
+# metrics.serviceMonitor.enabled=false 时不应注入 annotation
+out_off=$(helm template t . --set metrics.serviceMonitor.enabled=false)
+if echo "$out_off" | grep -q "prometheus.io/scrape"; then
+  fail "metrics.serviceMonitor.enabled=false but scrape annotation rendered"
+fi
+pass "annotation-based scrape toggle"
+
 # hostPath path/mountPath transparent
+out=$(helm template t . -f ci/default-values.yaml)
 echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.volumes[] | select(.name == "model-store") | .hostPath.path' \
   | grep -q "/data/models" || fail "hostPath path mismatch"
 echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.containers[0].volumeMounts[] | select(.name == "model-store") | .mountPath' \
@@ -74,7 +89,9 @@ echo "$out" | yq 'select(.kind == "Deployment") | .spec.template.spec.containers
 echo "[5/6] optional subcharts default off; togglable"
 out=$(helm template t . -f ci/default-values.yaml)
 if echo "$out" | grep -q "kind: DaemonSet"; then fail "subcharts default off but DaemonSet rendered"; fi
-if echo "$out" | grep -q "kind: Prometheus$"; then fail "kube-prometheus-stack default off but Prometheus CR rendered"; fi
+if echo "$out" | grep -E "kind: Deployment$" | grep -q "prometheus-server"; then
+  fail "prometheus subchart default off but server Deployment rendered"
+fi
 pass "subcharts default off"
 
 # 单独开 dcgm-exporter（最轻），断言其 DaemonSet 出现
@@ -82,16 +99,20 @@ out=$(helm template t . -n llm --set 'dcgm-exporter.enabled=true')
 echo "$out" | grep -q "kind: DaemonSet" || fail "dcgm-exporter on but DaemonSet not rendered"
 pass "dcgm-exporter toggle on"
 
-# 联动 1：kps 开启时 ServiceMonitor 自动带 release=<name>，且用户标签优先
-out=$(helm template t . -n llm --set 'kube-prometheus-stack.enabled=true' --set 'kube-prometheus-stack.crds.enabled=false')
-echo "$out" | yq 'select(.kind == "ServiceMonitor" and .metadata.name == "t-llm-helm-deployer") | .metadata.labels.release' \
-  | grep -qx "t" || fail "kps on but ServiceMonitor missing release=t label"
-pass "ServiceMonitor auto release label when kps on"
-
-out=$(helm template t . -n llm --set 'kube-prometheus-stack.enabled=true' --set 'kube-prometheus-stack.crds.enabled=false' --set 'metrics.serviceMonitor.labels.release=foo')
-echo "$out" | yq 'select(.kind == "ServiceMonitor" and .metadata.name == "t-llm-helm-deployer") | .metadata.labels.release' \
-  | grep -qx "foo" || fail "user release label override did not win"
-pass "user release label override wins"
+# prometheus 子 chart 启用：应渲染 prometheus-server Deployment + ConfigMap，
+# 且不应启用 alertmanager / pushgateway / node-exporter / kube-state-metrics
+out=$(helm template t . -n llm --set 'prometheus.enabled=true')
+echo "$out" | yq 'select(.kind == "Deployment") | .metadata.name' \
+  | grep -qx "t-prometheus-server" || fail "prometheus on but server Deployment not rendered"
+echo "$out" | yq 'select(.kind == "ConfigMap") | .metadata.name' \
+  | grep -qx "t-prometheus-server" || fail "prometheus on but server ConfigMap not rendered"
+if echo "$out" | yq 'select(.kind == "Deployment") | .metadata.name' | grep -qE 'alertmanager|pushgateway|kube-state-metrics'; then
+  fail "prometheus subchart unwanted components enabled"
+fi
+if echo "$out" | grep -q "kind: DaemonSet"; then
+  fail "prometheus subchart node-exporter should be disabled"
+fi
+pass "prometheus subchart minimal profile"
 
 echo "[6/6] global.imageRegistry / global.imagePullSecrets 离线场景透传"
 # 默认：无前缀
@@ -113,13 +134,22 @@ echo "$secrets" | grep -q "mc" || fail "imagePullSecrets missing main chart entr
 echo "$secrets" | grep -q "gc" || fail "imagePullSecrets missing global entry: $secrets"
 pass "imagePullSecrets merge main+global"
 
-# kps 子 chart 接收主 chart global（依赖 helm 原生 global 自动下发）
+# prometheus 子 chart 不支持 global.imageRegistry，需通过 prometheus.server.image.repository
+# 单独覆盖；这里断言"显式覆盖能落到渲染输出"
 out=$(helm template t . -n llm \
-  --set 'kube-prometheus-stack.enabled=true' \
-  --set 'kube-prometheus-stack.crds.enabled=false' \
-  --set global.imageRegistry=my-reg.io 2>&1 || true)
-# kps 内组件镜像应带 my-reg.io 前缀（任一组件命中即可）
-echo "$out" | grep -E 'image:\s*"?my-reg\.io/' >/dev/null || fail "global.imageRegistry not propagated to kube-prometheus-stack"
-pass "global.imageRegistry propagates to kube-prometheus-stack"
+  --set 'prometheus.enabled=true' \
+  --set 'prometheus.server.image.repository=my-reg.io/prometheus/prometheus')
+echo "$out" | yq 'select(.kind == "Deployment" and .metadata.name == "t-prometheus-server") | .spec.template.spec.containers[].image' \
+  | grep -q "^my-reg.io/prometheus/prometheus" || fail "prometheus.server.image.repository override not honored"
+pass "prometheus.server.image.repository override honored"
+
+# 离线镜像清单约束：监控段 = prometheus + config-reloader = 2 行（无 alertmanager/grafana/ksm/node-exporter/operator）
+mon_count=$(grep -E '^[^#]' ../tools/images.list | grep -E 'prometheus|grafana|alertmanager|node-exporter|kube-state-metrics' | wc -l | tr -d ' ')
+[ "$mon_count" = "2" ] || fail "tools/images.list monitoring image count should be 2 (prometheus + config-reloader), got: $mon_count"
+# 不应再出现 KPS 大件
+if grep -E '^[^#]' ../tools/images.list | grep -qE 'grafana|alertmanager|node-exporter|kube-state-metrics|prometheus-operator:'; then
+  fail "tools/images.list still contains KPS heavy components"
+fi
+pass "images.list monitoring slice slimmed"
 
 pass "all static tests passed"
