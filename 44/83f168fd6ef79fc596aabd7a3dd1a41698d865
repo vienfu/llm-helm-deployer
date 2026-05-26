@@ -1,0 +1,139 @@
+tools/images.list
+  8b3e277f03fd32fc 15-16 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a154ca1c4ad8aa4d100591e","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[15,16]}]}]}
+manifests/Chart.yaml
+  8b3e277f03fd32fc 27-28,30 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a154ca1c4ad8aa4d100591e","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[27,28]},{"Single":30}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "4483f168fd6ef79fc596aabd7a3dd1a41698d865",
+  "prompts": {
+    "0ced92e6cd281c0b": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-3f271bd5-04cf-401d-9df0-b4c4a0ed242a",
+        "model": "default"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 1
+    },
+    "2c544cc09ab911a6": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-87feb511-b1c5-4bb0-b04a-57cc41e68393",
+        "model": "default"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 1
+    },
+    "8b3e277f03fd32fc": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0aa400c4ad8aa4d1004baf",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 235,
+      "total_deletions": 42,
+      "accepted_lines": 228,
+      "overriden_lines": 0
+    },
+    "fd3ab38362fc4735": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-8d8e205d-ba88-4bcc-bbdd-e0272f881991",
+        "model": "default"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 1
+    }
+  },
+  "attestation_metadata": {
+    "manifests/Chart.yaml": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              27,
+              28
+            ]
+          },
+          {
+            "Single": 30
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a154ca1c4ad8aa4d100591e",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  27,
+                  28
+                ]
+              },
+              {
+                "Single": 30
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tools/images.list": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              15,
+              16
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a154ca1c4ad8aa4d100591e",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  15,
+                  16
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "8b3e277f03fd32fc": {
+      "tool": "trae",
+      "conversation_id": "6a0aa400c4ad8aa4d1004baf",
+      "session_id": "6a0aa400c4ad8aa4d1004baf",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
