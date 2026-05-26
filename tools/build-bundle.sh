@@ -90,8 +90,11 @@ ls "${BUILD_DIR}/chart"
 # === 2. 拉取镜像到 docker-archive ===
 echo
 echo "==> [2/5] skopeo copy images → docker-archive"
-# 仅保留非空非注释行
-mapfile -t IMAGES < <(grep -vE '^\s*(#|$)' "${IMAGES_LIST}")
+# 仅保留非空非注释行；用 while read 兼容 macOS 自带 bash 3.2（无 mapfile）
+IMAGES=()
+while IFS= read -r line; do
+  [ -n "${line}" ] && IMAGES+=("${line}")
+done < <(grep -vE '^[[:space:]]*(#|$)' "${IMAGES_LIST}" | awk '{$1=$1;print}')
 [ ${#IMAGES[@]} -gt 0 ] || { echo "ERROR: no images in ${IMAGES_LIST}" >&2; exit 4; }
 
 # 镜像 ref → 安全文件名: 全部小写、'/'→'-'、':'→'-'
