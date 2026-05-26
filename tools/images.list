@@ -12,9 +12,5 @@ nvcr.io/nvidia/k8s-device-plugin:v0.17.0
 # dcgm-exporter 3.4.2 (AppVersion 对齐)
 nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04
 
-# kube-prometheus-stack 65.0.0 (子组件 AppVersion 与上游 values 对齐)
-quay.io/prometheus/prometheus:v2.54.1
-docker.io/grafana/grafana:11.2.2
-quay.io/prometheus-operator/prometheus-operator:v0.77.1
-registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
-quay.io/prometheus/node-exporter:v1.8.2
+# prometheus 25.27.0 (单实例 Prometheus，annotation-based scrape)
+quay.io/prometheus/prometheus:v3.11.3

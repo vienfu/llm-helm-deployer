@@ -24,7 +24,7 @@ dependencies:
     version: "3.4.2"
     repository: https://nvidia.github.io/dcgm-exporter/helm-charts
     condition: dcgm-exporter.enabled
-  - name: kube-prometheus-stack
-    version: "65.0.0"
+  - name: prometheus
+    version: "25.27.0"
     repository: https://prometheus-community.github.io/helm-charts
-    condition: kube-prometheus-stack.enabled
+    condition: prometheus.enabled
