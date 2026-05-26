@@ -1,0 +1,156 @@
+tests/bundle-smoke-test.sh
+  8b3e277f03fd32fc 1-196 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a1507bfc4ad8aa4d100542d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[1,196]}]}]}
+README-OFFLINE.md
+  8b3e277f03fd32fc 1-132 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a1507bfc4ad8aa4d100542d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[1,132]}]}]}
+README.md
+  8b3e277f03fd32fc 96-97 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a1507bfc4ad8aa4d100542d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[96,97]}]}]}
+tools/install.sh
+  8b3e277f03fd32fc 242-243 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a1507bfc4ad8aa4d100542d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[242,243]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "998c136413a8645a8882aea08fad0bc3cd7ed241",
+  "prompts": {
+    "8b3e277f03fd32fc": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0aa400c4ad8aa4d1004baf",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 336,
+      "total_deletions": 6,
+      "accepted_lines": 332,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "README-OFFLINE.md": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              132
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a1507bfc4ad8aa4d100542d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  132
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "README.md": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              96,
+              97
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a1507bfc4ad8aa4d100542d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  96,
+                  97
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tests/bundle-smoke-test.sh": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              196
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a1507bfc4ad8aa4d100542d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  196
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tools/install.sh": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              242,
+              243
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a1507bfc4ad8aa4d100542d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  242,
+                  243
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "8b3e277f03fd32fc": {
+      "tool": "trae",
+      "conversation_id": "6a0aa400c4ad8aa4d1004baf",
+      "session_id": "6a0aa400c4ad8aa4d1004baf",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
