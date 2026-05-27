@@ -52,14 +52,16 @@ require skopeo
 require jq
 require tar
 
-# 跨平台 sha256
+# 跨平台 sha256：解析为真实可执行文件 + 参数，便于 xargs/find 直接调用
+# （shell 函数对 xargs 不可见，会报 'sha256: No such file or directory'）
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA256_CMD="sha256sum"
+else
+  # macOS: shasum -a 256
+  SHA256_CMD="shasum -a 256"
+fi
 sha256() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$@"
-  else
-    # macOS: shasum -a 256
-    shasum -a 256 "$@"
-  fi
+  ${SHA256_CMD} "$@"
 }
 
 # === 解析版本 ===
@@ -163,7 +165,7 @@ chmod +x "${BUILD_DIR}/tools/"*.sh "${BUILD_DIR}/install.sh"
 echo
 echo "==> [5/5] SHA256SUMS + tar.gz"
 ( cd "${BUILD_DIR}" && find . -type f ! -name SHA256SUMS -print0 \
-    | xargs -0 sha256 \
+    | xargs -0 ${SHA256_CMD} \
     | sed 's|  \./|  |' \
     | sort -k 2 \
     > SHA256SUMS )
