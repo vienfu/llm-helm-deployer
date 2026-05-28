@@ -237,16 +237,35 @@ cli_global_args() {
 cli_login() {
   local g; g="$(cli_global_args)"
   if [ -n "${DEST_USER:-}" ]; then
-    if [ "${DRY_RUN:-0}" = "1" ]; then
-      echo "[DRY] ${CLI_TOOL} ${g} login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
+    if cli_supports_password_stdin; then
+      cli_login_via_stdin
     else
-      echo "+ ${CLI_TOOL} ${g} login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
-      printf "%s" "${DEST_PASS}" | ${CLI_TOOL} ${g} login "${DEST_HOST}" -u "${DEST_USER}" --password-stdin
+      cli_login_via_authfile
     fi
   else
     echo "WARN: DEST_USER not set; relying on existing ${CLI_KIND} login state for ${DEST_HOST}" >&2
   fi
-  # 源 registry 鉴权（少见，例如 nvcr.io 私有仓 / 速率限）
+}
+
+# 检测当前 CLI 是否支持 `login --password-stdin`
+# 老旧 docker (<17.07) / 部分裁剪 CLI / 国产引擎可能缺这个 flag
+# DRY_RUN 模式下假定支持（避免在没装 CLI 的开发机上误判）
+cli_supports_password_stdin() {
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    return 0
+  fi
+  ${CLI_TOOL} login --help 2>&1 | grep -q -- '--password-stdin'
+}
+
+# 路径 A：标准 stdin 路径
+cli_login_via_stdin() {
+  local g; g="$(cli_global_args)"
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    echo "[DRY] ${CLI_TOOL} ${g} login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
+  else
+    echo "+ ${CLI_TOOL} ${g} login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
+    printf "%s" "${DEST_PASS}" | ${CLI_TOOL} ${g} login "${DEST_HOST}" -u "${DEST_USER}" --password-stdin
+  fi
   if [ -n "${SRC_USER:-}" ]; then
     for host in nvcr.io quay.io docker.io registry.k8s.io; do
       if [ "${DRY_RUN:-0}" = "1" ]; then
@@ -258,11 +277,99 @@ cli_login() {
   fi
 }
 
+# 路径 B：CLI 不支持 --password-stdin 时，直接写临时 auth 文件
+# 既不让密码进入 argv（避免 ps / shell history 泄漏），又能让 push 走鉴权
+# - docker / nerdctl 读 ${DOCKER_CONFIG}/config.json
+# - podman 读 ${REGISTRY_AUTH_FILE}
+# 退出时由 cli_logout trap 清理临时目录
+_AUTH_TMP_DIR=""
+_AUTH_FILE_PATH=""
+
+# 跨平台 base64：macOS 默认无 -w，Linux GNU 用 -w0；统一用 tr 去换行
+_b64_oneline() {
+  base64 | tr -d '\n'
+}
+
+# 累加一组 auths 到一个 JSON 文件
+# 输入：host  user  pass
+# 全程通过临时文件 + 文本拼接，不让密码出现在命令行参数里
+_write_authfile() {
+  local cfg="$1"
+  shift
+  # 收集 (host user pass) 三元组到数组
+  local -a entries=("$@")
+  local n=${#entries[@]}
+  local i=0
+  echo '{' >"${cfg}"
+  echo '  "auths": {' >>"${cfg}"
+  while [ $i -lt $n ]; do
+    local host="${entries[$i]}"
+    local user="${entries[$((i+1))]}"
+    local pass="${entries[$((i+2))]}"
+    local b64
+    b64="$(printf "%s" "${user}:${pass}" | _b64_oneline)"
+    local sep=","
+    [ $((i+3)) -ge $n ] && sep=""
+    printf '    "%s": { "auth": "%s" }%s\n' "${host}" "${b64}" "${sep}" >>"${cfg}"
+    i=$((i+3))
+  done
+  echo '  }' >>"${cfg}"
+  echo '}' >>"${cfg}"
+  chmod 600 "${cfg}"
+}
+
+cli_login_via_authfile() {
+  echo "INFO: ${CLI_KIND} 不支持 --password-stdin，降级到临时 auth 文件方式" >&2
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    echo "[DRY] write auth config (DOCKER_CONFIG / REGISTRY_AUTH_FILE) for ${DEST_HOST} as ${DEST_USER}"
+    if [ -n "${SRC_USER:-}" ]; then
+      echo "[DRY] write auth config for nvcr.io quay.io docker.io registry.k8s.io as ${SRC_USER}"
+    fi
+    return 0
+  fi
+
+  _AUTH_TMP_DIR="$(mktemp -d -t llm-mirror-XXXXXX 2>/dev/null || mktemp -d /tmp/llm-mirror-XXXXXX)"
+  chmod 700 "${_AUTH_TMP_DIR}"
+  _AUTH_FILE_PATH="${_AUTH_TMP_DIR}/config.json"
+
+  local -a entries=()
+  entries+=("${DEST_HOST}" "${DEST_USER}" "${DEST_PASS}")
+  if [ -n "${SRC_USER:-}" ]; then
+    entries+=("nvcr.io"          "${SRC_USER}" "${SRC_PASS}")
+    entries+=("quay.io"          "${SRC_USER}" "${SRC_PASS}")
+    entries+=("docker.io"        "${SRC_USER}" "${SRC_PASS}")
+    entries+=("registry.k8s.io"  "${SRC_USER}" "${SRC_PASS}")
+  fi
+  _write_authfile "${_AUTH_FILE_PATH}" "${entries[@]}"
+
+  case "${CLI_KIND}" in
+    docker|nerdctl)
+      export DOCKER_CONFIG="${_AUTH_TMP_DIR}"
+      echo "+ export DOCKER_CONFIG=${_AUTH_TMP_DIR}  (auth file for ${DEST_HOST})"
+      ;;
+    podman)
+      export REGISTRY_AUTH_FILE="${_AUTH_FILE_PATH}"
+      echo "+ export REGISTRY_AUTH_FILE=${_AUTH_FILE_PATH}"
+      ;;
+    *)
+      echo "ERROR: 不支持的 CLI: ${CLI_KIND}" >&2
+      exit 3
+      ;;
+  esac
+}
+
 cli_logout() {
   [ "${DRY_RUN:-0}" = "1" ] && return 0
   local g; g="$(cli_global_args)"
   if [ -n "${DEST_USER:-}" ]; then
-    ${CLI_TOOL} ${g} logout "${DEST_HOST}" >/dev/null 2>&1 || true
+    if [ -n "${_AUTH_TMP_DIR}" ] && [ -d "${_AUTH_TMP_DIR}" ]; then
+      # 路径 B：清理临时 auth 文件 + 取消 env
+      rm -rf "${_AUTH_TMP_DIR}"
+      unset DOCKER_CONFIG REGISTRY_AUTH_FILE
+    else
+      # 路径 A：常规 logout
+      ${CLI_TOOL} ${g} logout "${DEST_HOST}" >/dev/null 2>&1 || true
+    fi
   fi
 }
 
