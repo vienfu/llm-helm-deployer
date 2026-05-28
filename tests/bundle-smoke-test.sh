@@ -65,7 +65,9 @@ assert_rc() {
 # 避免开发者本地注释/裁剪镜像清单时影响测试断言（vllm 等核心镜像必须命中）。
 FIXTURE_IMAGES_LIST="docker.io/vllm/vllm-openai:v0.6.3
 docker.io/curlimages/curl:8.10.1
-quay.io/prometheus/prometheus:v3.11.3"
+quay.io/prometheus/prometheus:v3.11.3
+docker.io/grafana/grafana:12.3.1
+quay.io/kiwigrid/k8s-sidecar:2.5.0"
 
 make_fake_bundle() {
   local root="$1"
@@ -214,6 +216,39 @@ out=$(run_capture "" "${BUNDLE}/install.sh" \
   --dest-reg my-reg.io/llm \
   --skip-sha --skip-preflight --skip-mirror --dry-run 2>&1); rc=$?
 assert_rc "${rc}" "2" "install: chart/ 无 .tgz 应 exit 2"
+
+# 重建 bundle，准备 4f 用例（grafana 镜像）
+make_fake_bundle "${BUNDLE}"
+
+# 4f. grafana 镜像在 bundle 中应被 mirror 一并打包/推送
+# 验证：dry-run 输出包含 grafana/grafana 与 k8s-sidecar 的 pull/tag/push 三连
+# 注：mirror-images.sh 是 bundle-level 行为，不依赖 helm 是否启用 grafana；
+# 只要 images.list 列了 grafana 镜像，三件套就该一并 mirror。
+out=$(run_capture "" "${BUNDLE}/install.sh" \
+  --dest-reg my-reg.io/llm \
+  --use-docker \
+  --skip-sha --skip-preflight --dry-run); rc=$?
+assert_rc "${rc}" "0" "install→mirror(grafana): dry-run 退出码 0"
+mirror_section=$(printf '%s\n' "${out}" | awk '/\[3\/5\]/,/\[4\/5\]/')
+assert_contains "${mirror_section}" "docker.io/grafana/grafana:12.3.1" \
+  "install→mirror(grafana): 含 grafana/grafana:12.3.1 源镜像"
+assert_contains "${mirror_section}" "my-reg.io/llm/grafana:12.3.1" \
+  "install→mirror(grafana): grafana 重写到目标 registry（扁平化）"
+assert_contains "${mirror_section}" "quay.io/kiwigrid/k8s-sidecar:2.5.0" \
+  "install→mirror(grafana): 含 k8s-sidecar 源镜像"
+assert_contains "${mirror_section}" "my-reg.io/llm/k8s-sidecar:2.5.0" \
+  "install→mirror(grafana): k8s-sidecar 重写到目标 registry（扁平化）"
+
+# 4g. 关闭 grafana 不应影响 mirror（mirror 段是 bundle-level，与 helm 开关解耦）
+# 这里通过 --set 透传 helm value，但 mirror 阶段早于 helm，所以 grafana 镜像仍会被 mirror。
+# 此用例仅验证：透传 --set grafana.enabled=false 不破坏 dry-run 流程。
+out=$(run_capture "" "${BUNDLE}/install.sh" \
+  --dest-reg my-reg.io/llm \
+  --use-docker \
+  --skip-sha --skip-preflight --skip-mirror --dry-run \
+  --set grafana.enabled=false); rc=$?
+assert_rc "${rc}" "0" "install: --set grafana.enabled=false dry-run 退出码 0"
+assert_contains "${out}" "grafana.enabled=false" "install: --set grafana.enabled=false 透传到 helm 命令"
 
 echo
 echo "==> 结果: PASS=${PASS} FAIL=${FAIL}"

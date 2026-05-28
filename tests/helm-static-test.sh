@@ -154,4 +154,33 @@ if grep -E '^[^#]' ../tools/images.list | grep -qE 'alertmanager|node-exporter|k
 fi
 pass "images.list monitoring slice slimmed (prometheus + grafana lite)"
 
+# ---- grafana 可选 sub-chart 渲染断言 ----
+# 默认 grafana.enabled=false：渲染输出不应包含任何 grafana 资源
+out=$(helm template t . -n llm)
+echo "$out" | grep -q "^# Source: llm-helm-deployer/charts/grafana/" \
+  && fail "grafana.enabled=false (default) but grafana resources rendered"
+echo "$out" | yq 'select(.kind == "Deployment" and (.metadata.name | test("-grafana$")))' | grep -q "kind:" \
+  && fail "grafana.enabled=false (default) but grafana Deployment rendered"
+pass "grafana default disabled: no grafana resources rendered"
+
+# grafana.enabled=true：必须渲染出 Deployment + Service + datasource ConfigMap，
+# 且默认 datasource URL 指向本 chart 的 prometheus-server Service
+out=$(helm template t . -n llm-ns --set grafana.enabled=true --set prometheus.enabled=true)
+echo "$out" | grep -q "^# Source: llm-helm-deployer/charts/grafana/templates/deployment.yaml" \
+  || fail "grafana.enabled=true but no grafana Deployment rendered"
+echo "$out" | grep -q "^# Source: llm-helm-deployer/charts/grafana/templates/service.yaml" \
+  || fail "grafana.enabled=true but no grafana Service rendered"
+# 提取 grafana 主 ConfigMap 中的 datasources.yaml 字段（含 URL）
+ds_url=$(echo "$out" | yq 'select(.kind == "ConfigMap" and .metadata.name == "t-grafana") | .data."datasources.yaml"' | grep -E '^\s+url:' | head -1 | tr -d ' ')
+echo "$ds_url" | grep -q "url:http://prometheus-server.llm-ns.svc:80" \
+  || fail "grafana datasource URL not pointing to prometheus-server: $ds_url"
+pass "grafana enabled: Deployment + Service + datasource (-> prometheus-server.<ns>.svc) rendered"
+
+# 联动 dashboard 自动渲染：仅 grafana.enabled=true（不开 metrics.grafanaDashboard.enabled）
+# 也应渲染 vLLM dashboard ConfigMap（由 C2 引入）
+dash_cnt=$(echo "$out" | grep -c "^# Source: llm-helm-deployer/templates/grafana-dashboard.yaml")
+[ "$dash_cnt" = "1" ] \
+  || fail "grafana.enabled=true should auto-render grafana-dashboard.yaml exactly once, got $dash_cnt"
+pass "grafana enabled: dashboard ConfigMap auto-rendered (C2 联动语义)"
+
 pass "all static tests passed"
