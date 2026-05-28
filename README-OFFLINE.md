@@ -57,6 +57,12 @@ cd llm-deployer-bundle-<ver>
   --set model.name=/models/Qwen2.5-7B-Instruct \
   --set model.hostPath.path=/data/models
 # 脚本会一次性提示「请输入镜像仓库密码」，密码绝不入 env / 命令行 / shell 历史
+#
+# 客户场景没装 skopeo / docker？install.sh 还支持：
+#   --use-nerdctl   （containerd 节点常用，可配合 NERDCTL_NAMESPACE=k8s.io）
+#   --use-podman
+#   --use-docker
+#   都不指定时，mirror-images.sh 会按 skopeo > nerdctl > docker > podman 自动选择
 ```
 
 `install.sh` 编排步骤：
@@ -79,10 +85,13 @@ cd llm-deployer-bundle-<ver>
 # 2.1 集群预检
 ./tools/preflight-check.sh -n llm
 
-# 2.2 镜像同步（FROM_DIR 离线模式）
+# 2.2 镜像同步（FROM_DIR 离线模式；任选其一 CLI）
 FROM_DIR=./images USE_SKOPEO=1 \
 DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot \
   ./tools/mirror-images.sh
+# 或客户机只有 nerdctl：
+#   FROM_DIR=./images USE_NERDCTL=1 NERDCTL_NAMESPACE=k8s.io \
+#   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot ./tools/mirror-images.sh
 # 提示输入密码
 
 # 2.3 创建 pull secret（如需）
@@ -103,14 +112,14 @@ helm upgrade --install my-llm ./chart/llm-helm-deployer-*.tgz \
 
 - **架构**：`build-bundle.sh` 默认 `--override-arch amd64`，arm64 集群需自行重打。
 - **不含模型权重**：模型仍走 `model.hostPath`，需另行将权重目录拷到 GPU 节点（详见主 [README.md](./README.md) 的「模型权重」一节）。
-- **子 chart 镜像覆盖**：`nvidia-device-plugin` / `dcgm-exporter` / `prometheus` 均不识别 `global.imageRegistry`，需在 `install.sh` 后追加：
+- **子 chart 镜像覆盖**：`nvidia-device-plugin` / `dcgm-exporter` / `prometheus` 均不识别 `global.imageRegistry`，需在 `install.sh` 后追加（**注意**：`mirror-images.sh` v2 起目标仓库内的镜像路径已扁平化，只保留 `<image>:<tag>`，不再嵌套 `nvidia/k8s/...` 等多级目录）：
   ```
-  --set 'nvidia-device-plugin.image.repository=my-reg.io.example/llm/nvidia/k8s-device-plugin' \
-  --set 'dcgm-exporter.image.repository=my-reg.io.example/llm/nvidia/k8s/dcgm-exporter' \
-  --set 'prometheus.server.image.repository=my-reg.io.example/llm/prometheus/prometheus' \
-  --set 'prometheus.server.configmapReload.prometheus.image.repository=my-reg.io.example/llm/prometheus-operator/prometheus-config-reloader'
+  --set 'nvidia-device-plugin.image.repository=my-reg.io.example/llm/k8s-device-plugin' \
+  --set 'dcgm-exporter.image.repository=my-reg.io.example/llm/dcgm-exporter' \
+  --set 'prometheus.server.image.repository=my-reg.io.example/llm/prometheus' \
+  --set 'prometheus.server.configmapReload.prometheus.image.repository=my-reg.io.example/llm/prometheus-config-reloader'
   ```
-- **TLS 自签**：客户 registry 用自签证书时，`install.sh --dest-tls-verify false`（仅 skopeo 模式生效；docker 模式需先在 daemon 配 `insecure-registries`）。
+- **TLS 自签**：客户 registry 用自签证书时，`install.sh --dest-tls-verify false`（仅 skopeo 模式生效；docker / nerdctl / podman 模式需先在对应 daemon/containerd/registries.conf 配 `insecure-registries`）。
 - **可重入**：`install.sh` 全程基于 `helm upgrade --install` 与 `kubectl apply`，可重复执行；镜像同步阶段也可单独重跑（`tools/mirror-images.sh` + `FROM_DIR=./images`）。
 
 ## 退出码语义
@@ -130,5 +139,5 @@ helm upgrade --install my-llm ./chart/llm-helm-deployer-*.tgz \
 
 ```bash
 ./tests/bundle-smoke-test.sh
-# 期望: PASS=32 FAIL=0
+# 期望: PASS=37 FAIL=0
 ```

@@ -3,11 +3,11 @@
 # 升级子 chart 版本时同步更新此文件。
 
 # 主 chart
-docker.io/vllm/vllm-openai:v0.6.3
+# docker.io/vllm/vllm-openai:v0.20.0-cu130-ubuntu2404
 docker.io/curlimages/curl:8.10.1
 
 # nvidia-device-plugin 0.17.0 (AppVersion 对齐)
-nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+#nvcr.io/nvidia/k8s-device-plugin:v0.17.0
 
 # dcgm-exporter 3.4.2 (AppVersion 对齐)
 nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04

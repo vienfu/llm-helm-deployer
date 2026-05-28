@@ -105,14 +105,21 @@ helm test my-llm
 # 仅查看将执行的命令（不实际拉/推）
 DEST_REG=my-reg.io.example/llm DRY_RUN=1 ./tools/mirror-images.sh
 
-# 用 docker（默认）
+# 自动检测 CLI（按可用性：skopeo > nerdctl > docker > podman）
 DEST_REG=my-reg.io.example/llm ./tools/mirror-images.sh
 
-# 用 skopeo（推荐，无需本地 docker daemon）
-DEST_REG=my-reg.io.example/llm USE_SKOPEO=1 ./tools/mirror-images.sh
+# 显式指定（互斥，至多一个）
+DEST_REG=my-reg.io.example/llm USE_SKOPEO=1  ./tools/mirror-images.sh   # 推荐：无 daemon 依赖
+DEST_REG=my-reg.io.example/llm USE_NERDCTL=1 ./tools/mirror-images.sh   # containerd 节点常用
+DEST_REG=my-reg.io.example/llm USE_PODMAN=1  ./tools/mirror-images.sh   # RHEL/Rocky 默认
+DEST_REG=my-reg.io.example/llm USE_DOCKER=1  ./tools/mirror-images.sh
+
+# nerdctl 模式可注入 containerd namespace（让 kubelet 直接消费）
+DEST_REG=my-reg.io.example/llm USE_NERDCTL=1 NERDCTL_NAMESPACE=k8s.io \
+  ./tools/mirror-images.sh
 ```
 
-镜像被搬运到 `${DEST_REG}/<原 path>:<原 tag>`，路径与 tag 与公网保持一致，便于 `global.imageRegistry` 单点改写。
+镜像被搬运到 `${DEST_REG}/<image>:<tag>`，**目标仓库内统一扁平化（只保留镜像名:tag）**，不再保留源 registry 的多级目录。这样在 `--set sub.image.repository=...` 覆盖时只需要拼一次 `${DEST_REG}/<image>` 即可。
 
 ### 2. 离线安装
 
@@ -130,11 +137,11 @@ helm install my-llm ./manifests -n llm --create-namespace \
 | 子 chart | 是否接受 `global.imageRegistry` | 离线场景配置方式 |
 |----------|------------------------------|-----------------|
 | 主 chart（vLLM）| ✅ | 主 chart helper 自动拼前缀 |
-| `prometheus` | ❌ | 需显式覆盖 `--set prometheus.server.image.repository=my-reg.io.example/llm/prometheus/prometheus` 以及 `--set prometheus.server.configmapReload.prometheus.image.repository=my-reg.io.example/llm/prometheus-operator/prometheus-config-reloader` |
-| `nvidia-device-plugin` | ❌ | 需显式覆盖 `--set nvidia-device-plugin.image.repository=my-reg.io.example/llm/nvidia/k8s-device-plugin` |
-| `dcgm-exporter` | ❌ | 需显式覆盖 `--set dcgm-exporter.image.repository=my-reg.io.example/llm/nvidia/k8s/dcgm-exporter` |
+| `prometheus` | ❌ | 需显式覆盖 `--set prometheus.server.image.repository=my-reg.io.example/llm/prometheus` 以及 `--set prometheus.server.configmapReload.prometheus.image.repository=my-reg.io.example/llm/prometheus-config-reloader` |
+| `nvidia-device-plugin` | ❌ | 需显式覆盖 `--set nvidia-device-plugin.image.repository=my-reg.io.example/llm/k8s-device-plugin` |
+| `dcgm-exporter` | ❌ | 需显式覆盖 `--set dcgm-exporter.image.repository=my-reg.io.example/llm/dcgm-exporter` |
 
-> 镜像同步脚本结束时会打印对应的 `--set` 命令，可直接复制使用。
+> `mirror-images.sh` 把镜像扁平化到 `${DEST_REG}/<image>:<tag>`，因此覆盖路径只需 `${DEST_REG}/<image>`，不再嵌套 `nvidia/k8s/...` 等多级目录。脚本结束时会打印对应的 `--set` 命令，可直接复制使用。
 
 ## 暴露的指标
 

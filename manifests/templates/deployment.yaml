@@ -18,14 +18,7 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- $extraAnnotations := dict }}
-      {{- if .Values.metrics.serviceMonitor.enabled }}
-      {{- $_ := set $extraAnnotations "prometheus.io/scrape" "true" }}
-      {{- $_ := set $extraAnnotations "prometheus.io/port" (printf "%v" .Values.vllm.port) }}
-      {{- $_ := set $extraAnnotations "prometheus.io/path" "/metrics" }}
-      {{- end }}
-      {{- $allAnnotations := merge (.Values.podAnnotations | default dict) $extraAnnotations }}
-      {{- with $allAnnotations }}
+      {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -83,15 +76,10 @@ spec:
             - name: dshm
               mountPath: /dev/shm
           resources:
+            {{- with .Values.resources.limits }}
             limits:
-              nvidia.com/gpu: {{ include "llm-helm-deployer.gpuCount" . }}
-              {{- with .Values.resources.limits }}
-              {{- range $k, $v := . }}
-              {{- if ne $k "nvidia.com/gpu" }}
-              {{ $k }}: {{ $v }}
-              {{- end }}
-              {{- end }}
-              {{- end }}
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
             {{- with .Values.resources.requests }}
             requests:
               {{- toYaml . | nindent 14 }}

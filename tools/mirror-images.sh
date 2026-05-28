@@ -27,9 +27,20 @@
 #   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot USE_SKOPEO=1 \
 #       ./tools/mirror-images.sh
 #
+#   # nerdctl 模式（containerd 节点，无 docker 时常用）
+#   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot USE_NERDCTL=1 \
+#       ./tools/mirror-images.sh
+#
+#   # podman 模式（RHEL/Rocky/openSUSE 默认）
+#   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot USE_PODMAN=1 \
+#       ./tools/mirror-images.sh
+#
+#   # 自动选择：skopeo > nerdctl > docker > podman（按可用性，无需任何 USE_*）
+#   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot ./tools/mirror-images.sh
+#
 #   # === 离线模式（方案 C）===
-#   # 解压 bundle 后在 bundle 目录下执行：
-#   FROM_DIR=./images USE_SKOPEO=1 \
+#   # 解压 bundle 后在 bundle 目录下执行（任意一种 CLI 都可）：
+#   FROM_DIR=./images USE_NERDCTL=1 \
 #   DEST_REG=my-reg.io.example/llm DEST_USER=ci-bot \
 #       ./tools/mirror-images.sh
 #
@@ -41,7 +52,11 @@
 #   IMAGES_LIST      镜像清单文件路径（默认 tools/images.list，与脚本同目录）
 #   SRC_USER         源 registry 用户名（仅在线模式 + 源镜像需要鉴权时，如 nvcr.io NGC API Key）；
 #                    非空则强制从 stdin 读取源 registry 密码
-#   USE_SKOPEO       设为 1 用 skopeo copy（推荐）；否则 docker pull/tag/push
+#   USE_SKOPEO       设为 1 用 skopeo copy（推荐，无 daemon 依赖）
+#   USE_NERDCTL      设为 1 用 nerdctl pull/tag/push（containerd 生态）
+#   USE_PODMAN       设为 1 用 podman pull/tag/push
+#   USE_DOCKER       设为 1 用 docker pull/tag/push
+#   NERDCTL_NAMESPACE  仅 nerdctl 模式生效，默认空；设为 k8s.io 时镜像同步到 kubelet 可见的 namespace
 #   DRY_RUN          设为 1 仅打印命令，不执行
 #
 # 安全策略：
@@ -132,12 +147,14 @@ run() {
   fi
 }
 
-# 把 docker.io/foo/bar:tag → ${DEST_REG}/foo/bar:tag
-# 其他 registry 同样剥掉 host，保留路径与 tag。
-strip_host() {
+# 取镜像名:tag（剥掉所有 registry/path 前缀，只保留最后一段）
+# 例：docker.io/vllm/vllm-openai:v0.6.3        → vllm-openai:v0.6.3
+# 例：nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5   → dcgm-exporter:3.3.5
+# 例：quay.io/prometheus/prometheus:v3.11.3    → prometheus:v3.11.3
+# 拼装：${DEST_REG}/${repo_tag}，目标 registry 下扁平化，避免内部多级路径污染
+repo_tag() {
   local img="$1"
-  # 去掉首段 host（含 ':' 或第一个 '/'）
-  echo "${img#*/}"
+  echo "${img##*/}"
 }
 
 # 与 build-bundle.sh 保持一致的 tar 文件名规则
@@ -161,34 +178,91 @@ resolve_archive() {
   echo "${FROM_DIR}/$(safe_name "${ref}").tar"
 }
 
-# === 鉴权：docker 模式 ===
-docker_login() {
+# === 鉴权：docker / nerdctl / podman 模式 ===
+# 三家 CLI 在 login/logout/pull/tag/push/load 上语法完全兼容，统一封装 ${CLI_TOOL}
+# nerdctl 多一个 --namespace 概念（containerd 命名空间，不是 k8s namespace）：
+#   - 默认 default；NERDCTL_NAMESPACE=k8s.io 时镜像可被节点 kubelet 直接消费
+CLI_TOOL=""
+CLI_KIND=""
+
+# 选择 CLI：显式 USE_* > 自动检测（skopeo > nerdctl > docker > podman）
+# DRY_RUN=1 模式下不强制要求 CLI 已安装（便于在没装对应工具的机器上预览命令）
+select_cli_tool() {
+  local need_check=1
+  [ "${DRY_RUN:-0}" = "1" ] && need_check=0
+
+  if [ "${USE_SKOPEO:-0}" = "1" ]; then
+    [ "${need_check}" = "1" ] && { command -v skopeo >/dev/null || { echo "ERROR: USE_SKOPEO=1 但未安装 skopeo" >&2; exit 3; }; }
+    CLI_KIND="skopeo"; CLI_TOOL="skopeo"; return
+  fi
+  if [ "${USE_NERDCTL:-0}" = "1" ]; then
+    [ "${need_check}" = "1" ] && { command -v nerdctl >/dev/null || { echo "ERROR: USE_NERDCTL=1 但未安装 nerdctl" >&2; exit 3; }; }
+    CLI_KIND="nerdctl"; CLI_TOOL="nerdctl"; return
+  fi
+  if [ "${USE_PODMAN:-0}" = "1" ]; then
+    [ "${need_check}" = "1" ] && { command -v podman >/dev/null || { echo "ERROR: USE_PODMAN=1 但未安装 podman" >&2; exit 3; }; }
+    CLI_KIND="podman"; CLI_TOOL="podman"; return
+  fi
+  if [ "${USE_DOCKER:-0}" = "1" ]; then
+    [ "${need_check}" = "1" ] && { command -v docker >/dev/null || { echo "ERROR: USE_DOCKER=1 但未安装 docker" >&2; exit 3; }; }
+    CLI_KIND="docker"; CLI_TOOL="docker"; return
+  fi
+  # 自动检测：skopeo > nerdctl > docker > podman
+  if command -v skopeo >/dev/null; then
+    CLI_KIND="skopeo"; CLI_TOOL="skopeo"
+  elif command -v nerdctl >/dev/null; then
+    CLI_KIND="nerdctl"; CLI_TOOL="nerdctl"
+  elif command -v docker >/dev/null; then
+    CLI_KIND="docker"; CLI_TOOL="docker"
+  elif command -v podman >/dev/null; then
+    CLI_KIND="podman"; CLI_TOOL="podman"
+  else
+    if [ "${need_check}" = "1" ]; then
+      echo "ERROR: 未检测到 skopeo / nerdctl / docker / podman 中的任何一个" >&2
+      echo "       请安装其中之一，或显式 USE_SKOPEO / USE_NERDCTL / USE_DOCKER / USE_PODMAN=1" >&2
+      exit 3
+    fi
+    # DRY_RUN 兜底
+    CLI_KIND="docker"; CLI_TOOL="docker"
+  fi
+}
+
+# nerdctl 全局参数（namespace），其它 CLI 返回空
+cli_global_args() {
+  if [ "${CLI_KIND}" = "nerdctl" ] && [ -n "${NERDCTL_NAMESPACE:-}" ]; then
+    echo "--namespace=${NERDCTL_NAMESPACE}"
+  fi
+}
+
+cli_login() {
+  local g; g="$(cli_global_args)"
   if [ -n "${DEST_USER:-}" ]; then
     if [ "${DRY_RUN:-0}" = "1" ]; then
-      echo "[DRY] docker login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
+      echo "[DRY] ${CLI_TOOL} ${g} login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
     else
-      echo "+ docker login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
-      printf "%s" "${DEST_PASS}" | docker login "${DEST_HOST}" -u "${DEST_USER}" --password-stdin
+      echo "+ ${CLI_TOOL} ${g} login ${DEST_HOST} -u ${DEST_USER} --password-stdin"
+      printf "%s" "${DEST_PASS}" | ${CLI_TOOL} ${g} login "${DEST_HOST}" -u "${DEST_USER}" --password-stdin
     fi
   else
-    echo "WARN: DEST_USER not set; relying on existing docker login state for ${DEST_HOST}" >&2
+    echo "WARN: DEST_USER not set; relying on existing ${CLI_KIND} login state for ${DEST_HOST}" >&2
   fi
   # 源 registry 鉴权（少见，例如 nvcr.io 私有仓 / 速率限）
   if [ -n "${SRC_USER:-}" ]; then
     for host in nvcr.io quay.io docker.io registry.k8s.io; do
       if [ "${DRY_RUN:-0}" = "1" ]; then
-        echo "[DRY] docker login ${host} -u ${SRC_USER} --password-stdin"
+        echo "[DRY] ${CLI_TOOL} ${g} login ${host} -u ${SRC_USER} --password-stdin"
       else
-        printf "%s" "${SRC_PASS}" | docker login "${host}" -u "${SRC_USER}" --password-stdin || true
+        printf "%s" "${SRC_PASS}" | ${CLI_TOOL} ${g} login "${host}" -u "${SRC_USER}" --password-stdin || true
       fi
     done
   fi
 }
 
-docker_logout() {
+cli_logout() {
   [ "${DRY_RUN:-0}" = "1" ] && return 0
+  local g; g="$(cli_global_args)"
   if [ -n "${DEST_USER:-}" ]; then
-    docker logout "${DEST_HOST}" >/dev/null 2>&1 || true
+    ${CLI_TOOL} ${g} logout "${DEST_HOST}" >/dev/null 2>&1 || true
   fi
 }
 
@@ -214,18 +288,18 @@ skopeo_src_args() {
 }
 
 # === 主流程 ===
+select_cli_tool
 if [ -n "${FROM_DIR}" ]; then
-  echo "==> 离线模式 (FROM_DIR=${FROM_DIR})"
+  echo "==> 离线模式 (FROM_DIR=${FROM_DIR}, CLI=${CLI_KIND})"
 else
-  echo "==> 在线模式（从公网 registry 拉取）"
+  echo "==> 在线模式 (CLI=${CLI_KIND})"
 fi
 
-if [ "${USE_SKOPEO:-0}" = "1" ]; then
-  command -v skopeo >/dev/null || { echo "ERROR: skopeo not installed" >&2; exit 3; }
+if [ "${CLI_KIND}" = "skopeo" ]; then
   src_args="$(skopeo_src_args)"
   dst_args="$(skopeo_dest_args)"
   for src in "${IMAGES[@]}"; do
-    dst_path=$(strip_host "$src")
+    dst_path=$(repo_tag "$src")
     dst="${DEST_REG}/${dst_path}"
     if [ -n "${FROM_DIR}" ]; then
       archive="$(resolve_archive "${src}")"
@@ -237,26 +311,34 @@ if [ "${USE_SKOPEO:-0}" = "1" ]; then
     fi
   done
 else
-  command -v docker >/dev/null || { echo "ERROR: docker not installed (or set USE_SKOPEO=1)" >&2; exit 3; }
+  # docker / nerdctl / podman 共用同一组语法
   if [ "${DEST_TLS_VERIFY:-true}" = "false" ]; then
-    echo "WARN: docker 模式不支持 per-push 跳过 TLS 校验，请预先把 ${DEST_HOST} 加到 docker daemon insecure-registries" >&2
+    case "${CLI_KIND}" in
+      docker)
+        echo "WARN: docker 模式不支持 per-push 跳过 TLS 校验，请预先把 ${DEST_HOST} 加到 docker daemon insecure-registries" >&2 ;;
+      nerdctl)
+        echo "WARN: nerdctl 模式不支持 per-push 跳过 TLS 校验，请预先把 ${DEST_HOST} 加到 /etc/containerd/certs.d 或 nerdctl --insecure-registry（containerd 配置）" >&2 ;;
+      podman)
+        echo "WARN: podman 模式请把 ${DEST_HOST} 加到 /etc/containers/registries.conf 的 insecure list" >&2 ;;
+    esac
   fi
-  docker_login
-  trap docker_logout EXIT
+  cli_login
+  trap cli_logout EXIT
+  g="$(cli_global_args)"
   for src in "${IMAGES[@]}"; do
-    dst_path=$(strip_host "$src")
+    dst_path=$(repo_tag "$src")
     dst="${DEST_REG}/${dst_path}"
     if [ -n "${FROM_DIR}" ]; then
       archive="$(resolve_archive "${src}")"
       [ -f "${archive}" ] || { echo "ERROR: archive not found: ${archive}" >&2; exit 5; }
-      # docker load 后 image 仍以原 ref 出现在本地，再 tag + push
-      run "docker load -i ${archive}"
-      run "docker tag ${src} ${dst}"
-      run "docker push ${dst}"
+      # load 后 image 仍以原 ref 出现在本地，再 tag + push
+      run "${CLI_TOOL} ${g} load -i ${archive}"
+      run "${CLI_TOOL} ${g} tag ${src} ${dst}"
+      run "${CLI_TOOL} ${g} push ${dst}"
     else
-      run "docker pull ${src}"
-      run "docker tag ${src} ${dst}"
-      run "docker push ${dst}"
+      run "${CLI_TOOL} ${g} pull ${src}"
+      run "${CLI_TOOL} ${g} tag ${src} ${dst}"
+      run "${CLI_TOOL} ${g} push ${dst}"
     fi
   done
 fi
@@ -272,6 +354,6 @@ echo "    --docker-server=${DEST_HOST} \\"
 echo "    --docker-username='<USER>' --docker-password='<PASS>'"
 echo
 echo "注意 nvidia-device-plugin / dcgm-exporter 不接受 global.imageRegistry，"
-echo "需要额外覆盖："
-echo "  --set 'nvidia-device-plugin.image.repository=${DEST_REG}/nvidia/k8s-device-plugin' \\"
-echo "  --set 'dcgm-exporter.image.repository=${DEST_REG}/nvidia/k8s/dcgm-exporter'"
+echo "需要额外覆盖（注意：扁平化后路径不再保留原 registry 内的多级目录）："
+echo "  --set 'nvidia-device-plugin.image.repository=${DEST_REG}/k8s-device-plugin' \\"
+echo "  --set 'dcgm-exporter.image.repository=${DEST_REG}/dcgm-exporter'"

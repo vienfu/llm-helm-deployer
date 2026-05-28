@@ -120,6 +120,10 @@ vLLM 容器完整镜像引用：global.imageRegistry 非空时拼前缀；否则
 - --max-model-len
 - {{ .Values.vllm.maxModelLen | quote }}
 {{- end }}
+{{- if .Values.vllm.maxNumSeqs }}
+- --max-num-seqs
+- {{ .Values.vllm.maxNumSeqs | quote }}
+{{- end }}
 {{- if .Values.vllm.dtype }}
 - --dtype
 - {{ .Values.vllm.dtype | quote }}

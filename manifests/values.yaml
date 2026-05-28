@@ -1,5 +1,5 @@
 image:
-  repository: vllm/vllm-openai
+  repository: vllm-openai
   tag: v0.20.0-cu130-ubuntu2404
   pullPolicy: IfNotPresent
 imagePullSecrets: []
@@ -30,6 +30,7 @@ vllm:
   tensorParallelSize: 1
   gpuMemoryUtilization: 0.9
   maxModelLen: ""
+  maxNumSeqs: ""
   dtype: auto
   trustRemoteCode: false
   port: 8000
@@ -41,7 +42,10 @@ auth:
 service:
   type: ClusterIP
   port: 8000
-  annotations: {}
+  annotations: 
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
 
 ingress:
   enabled: false
@@ -134,33 +138,44 @@ nvidia-device-plugin:
   # 私有 registry 凭证；与主 chart 顶层 imagePullSecrets 无关，需单独配置
   imagePullSecrets: []
   # 调度到带 GPU 的节点（NFD 标签）；若集群未装 NFD，请清空 nodeSelector
-  nodeSelector:
-    feature.node.kubernetes.io/pci-10de.present: "true"
-  tolerations:
-    - key: nvidia.com/gpu
-      operator: Exists
-      effect: NoSchedule
+  nodeSelector: {}
+  #nodeSelector:
+  #  feature.node.kubernetes.io/pci-10de.present: "true"
+  tolerations: []
+  #tolerations:
+  #  - key: nvidia.com/gpu
+  #    operator: Exists
+  #    effect: NoSchedule
 
 dcgm-exporter:
-  enabled: false
+  enabled: true
+  fullnameOverride: "dcgm-exporter"
   # 镜像（如需私有 registry 取消注释，本 chart 也不支持 global.imageRegistry）
-  # image:
-  #   repository: my-reg.io/nvidia/k8s/dcgm-exporter   # = global.imageRegistry + 原 nvcr.io 路径片段
-  #   tag: ""                                           # 留空跟随子 chart AppVersion
-  #   pullPolicy: IfNotPresent
+  image:
+    repository: dcgm-exporter   # = global.imageRegistry + 原 nvcr.io 路径片段
+    tag: "3.3.5-3.4.0-ubuntu22.04"                                    # 留空跟随子 chart AppVersion
+    pullPolicy: IfNotPresent
   imagePullSecrets: []
   # 调度到 GPU 节点；非 GPU 节点上 dcgm-exporter 会启动失败
-  nodeSelector:
-    feature.node.kubernetes.io/pci-10de.present: "true"
-  tolerations:
-    - key: nvidia.com/gpu
-      operator: Exists
-      effect: NoSchedule
+  nodeSelector: {}
+  #nodeSelector:
+  #  feature.node.kubernetes.io/pci-10de.present: "true"
+  tolerations: []
+  #tolerations:
+  #  - key: nvidia.com/gpu
+  #    operator: Exists
+  #    effect: NoSchedule
   serviceMonitor:
     enabled: true
+  service:
+    type: ClusterIP
+    annotations: 
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9400"
+      prometheus.io/path: "/metrics"
 
 prometheus:
-  enabled: false
+  enabled: true
   # 单实例 Prometheus（prometheus-community/prometheus 29.8.0，appVersion v3.11.3）。
   # 已关闭 alertmanager / pushgateway / node-exporter / kube-state-metrics，
   # 只保留 prometheus-server，配合 annotation-based scrape 抓取 vLLM Pod。
@@ -172,9 +187,15 @@ prometheus:
     enabled: false
   kube-state-metrics:
     enabled: false
+  configmapReload:
+    prometheus:
+      image:
+        repository: prometheus-config-reloader
+        tag: v0.91.0
   server:
+    fullnameOverride: "prometheus-server"
     image:
-      repository: quay.io/prometheus/prometheus
+      repository: prometheus
       tag: v3.11.3
     persistentVolume:
       # 默认使用 emptyDir（Pod 重启数据丢失）；生产场景建议设为 true。

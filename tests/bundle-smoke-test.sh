@@ -61,13 +61,19 @@ assert_rc() {
 }
 
 # === 准备伪 bundle ===
+# 注意：images.list 内置固定清单，与用户本地 tools/images.list 解耦，
+# 避免开发者本地注释/裁剪镜像清单时影响测试断言（vllm 等核心镜像必须命中）。
+FIXTURE_IMAGES_LIST="docker.io/vllm/vllm-openai:v0.6.3
+docker.io/curlimages/curl:8.10.1
+quay.io/prometheus/prometheus:v3.11.3"
+
 make_fake_bundle() {
   local root="$1"
   rm -rf "${root}"
   mkdir -p "${root}"/{chart,images,tools}
   cp "${TOOLS_DIR}/mirror-images.sh"   "${root}/tools/"
   cp "${TOOLS_DIR}/preflight-check.sh" "${root}/tools/"
-  cp "${TOOLS_DIR}/images.list"        "${root}/tools/"
+  printf '%s\n' "${FIXTURE_IMAGES_LIST}" > "${root}/tools/images.list"
   cp "${TOOLS_DIR}/install.sh"         "${root}/install.sh"
   chmod +x "${root}/install.sh" "${root}/tools/"*.sh
   : > "${root}/chart/llm-helm-deployer-0.1.0.tgz"
@@ -77,7 +83,7 @@ make_fake_bundle() {
     local f
     f=$(echo "${img}" | tr '[:upper:]' '[:lower:]' | tr '/:' '--').tar
     : > "${root}/images/${f}"
-  done < <(grep -vE '^[[:space:]]*(#|$)' "${TOOLS_DIR}/images.list")
+  done < <(grep -vE '^[[:space:]]*(#|$)' "${root}/tools/images.list")
 }
 
 echo "==> [1/4] mirror-images.sh 语法 + 参数契约"
@@ -155,16 +161,37 @@ assert_not_contains "${out}" "global.imagePullSecrets[0].name" \
   "install: 未传 --create-pull-secret 时不渲染 imagePullSecrets"
 
 # 4b. 跑到 [3] 镜像同步（FROM_DIR 走 docker load 链；不传 --skip-mirror）
+# 显式 --use-docker 锁定到 docker 分支，避免 macOS 自动选到 skopeo 后无法命中 docker load 断言
 out=$(run_capture "" "${BUNDLE}/install.sh" \
   --dest-reg my-reg.io/llm \
+  --use-docker \
   --skip-sha --skip-preflight --dry-run); rc=$?
 assert_rc "${rc}" "0" "install: 含 mirror 的完整 dry-run 退出码 0"
 # 用 awk 抽 [3/5] 段
 mirror_section=$(printf '%s\n' "${out}" | awk '/\[3\/5\]/,/\[4\/5\]/')
 assert_contains "${mirror_section}" "离线模式 (FROM_DIR=" "install→mirror: FROM_DIR 模式"
-assert_contains "${mirror_section}" "[DRY] docker load -i" "install→mirror: docker load 链"
+assert_contains "${mirror_section}" "[DRY] docker  load -i" "install→mirror: docker load 链"
 assert_contains "${mirror_section}" "docker.io/vllm/vllm-openai:v0.6.3" "install→mirror: 含核心 vllm 镜像"
-assert_contains "${mirror_section}" "my-reg.io/llm/vllm/vllm-openai:v0.6.3" "install→mirror: 重写到目标 registry"
+assert_contains "${mirror_section}" "my-reg.io/llm/vllm-openai:v0.6.3" "install→mirror: 重写到目标 registry（扁平化）"
+assert_not_contains "${mirror_section}" "my-reg.io/llm/vllm/vllm-openai:v0.6.3" \
+  "install→mirror: 不再保留源 registry 内的多级目录"
+
+# 4b'. nerdctl 模式 dry-run，验证 CLI 切换 + namespace 注入
+out=$(run_capture "" "${BUNDLE}/install.sh" \
+  --dest-reg my-reg.io/llm \
+  --use-nerdctl \
+  --skip-sha --skip-preflight --dry-run); rc=$?
+assert_rc "${rc}" "0" "install: --use-nerdctl dry-run 退出码 0"
+mirror_section=$(printf '%s\n' "${out}" | awk '/\[3\/5\]/,/\[4\/5\]/')
+assert_contains "${mirror_section}" "[DRY] nerdctl  load -i" "install→mirror: nerdctl load 链"
+assert_contains "${mirror_section}" "my-reg.io/llm/vllm-openai:v0.6.3" "install→mirror: nerdctl 也走扁平路径"
+
+# 4b''. --use-* 互斥校验
+out=$(run_capture "" "${BUNDLE}/install.sh" \
+  --dest-reg my-reg.io/llm \
+  --use-docker --use-nerdctl \
+  --skip-sha --skip-preflight --skip-mirror --dry-run 2>&1); rc=$?
+assert_rc "${rc}" "2" "install: --use-docker 与 --use-nerdctl 互斥应 exit 2"
 
 # 4c. SHA256SUMS 缺失应 WARN 而非 FAIL（不阻塞）
 out=$(run_capture "" "${BUNDLE}/install.sh" \

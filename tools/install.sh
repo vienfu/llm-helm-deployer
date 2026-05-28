@@ -28,7 +28,11 @@
 #   --dest-tls-verify <bool>    传给 mirror（true|false，默认 true）
 #   --pull-secret <name>        imagePullSecret 名（默认 llm-pull-secret）
 #   --create-pull-secret        在 namespace 内创建/更新 pull secret
-#   --use-skopeo                mirror 用 skopeo（默认 docker）
+#   --use-skopeo                mirror 用 skopeo（推荐，无 daemon 依赖）
+#   --use-nerdctl               mirror 用 nerdctl（containerd 节点常用）
+#   --use-podman                mirror 用 podman
+#   --use-docker                mirror 用 docker
+#                               （都不指定时 mirror-images.sh 自动检测：skopeo > nerdctl > docker > podman）
 #   --values <file>             附加 -f <file>（可重复）
 #   --set <kv>                  附加 --set kv（可重复）
 #   --skip-sha                  跳过 SHA256SUMS 校验
@@ -54,6 +58,9 @@ DEST_TLS_VERIFY="true"
 PULL_SECRET="llm-pull-secret"
 CREATE_PULL_SECRET=0
 USE_SKOPEO=0
+USE_NERDCTL=0
+USE_PODMAN=0
+USE_DOCKER=0
 SKIP_SHA=0
 SKIP_PREFLIGHT=0
 SKIP_MIRROR=0
@@ -74,6 +81,9 @@ while [ $# -gt 0 ]; do
     --pull-secret)         PULL_SECRET="$2"; shift 2 ;;
     --create-pull-secret)  CREATE_PULL_SECRET=1; shift ;;
     --use-skopeo)          USE_SKOPEO=1; shift ;;
+    --use-nerdctl)         USE_NERDCTL=1; shift ;;
+    --use-podman)          USE_PODMAN=1; shift ;;
+    --use-docker)          USE_DOCKER=1; shift ;;
     --values)              EXTRA_VALUES+=("$2"); shift 2 ;;
     --set)                 EXTRA_SETS+=("$2"); shift 2 ;;
     --skip-sha)            SKIP_SHA=1; shift ;;
@@ -92,7 +102,21 @@ done
 
 [ -n "${DEST_REG}" ] || { echo "ERROR: --dest-reg 必填" >&2; exit 2; }
 
+# CLI 选择互斥校验：--use-* 系列至多一个
+_cli_count=$(( USE_SKOPEO + USE_NERDCTL + USE_PODMAN + USE_DOCKER ))
+if [ "${_cli_count}" -gt 1 ]; then
+  echo "ERROR: --use-skopeo / --use-nerdctl / --use-podman / --use-docker 互斥，最多指定一个" >&2
+  exit 2
+fi
+
 DEST_HOST="${DEST_REG%%/*}"
+
+# mirror CLI 标签：用于日志展示与传给 mirror-images.sh
+_cli_label="auto"
+[ "${USE_SKOPEO}"  -eq 1 ] && _cli_label="skopeo"
+[ "${USE_NERDCTL}" -eq 1 ] && _cli_label="nerdctl"
+[ "${USE_PODMAN}"  -eq 1 ] && _cli_label="podman"
+[ "${USE_DOCKER}"  -eq 1 ] && _cli_label="docker"
 
 # === 工具检查 ===
 require() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: 缺少工具: $1" >&2; exit 3; }; }
@@ -185,7 +209,7 @@ if [ "${VERBOSE}" -eq 1 ]; then
                            | awk -F'"' '/gitVersion/{print $4; exit}' \
                            || echo unknown)"
   debug "kubectl context: $(kubectl config current-context 2>/dev/null || echo unknown)"
-  debug "use-skopeo: ${USE_SKOPEO}  dest-tls-verify: ${DEST_TLS_VERIFY}"
+  debug "mirror cli: ${_cli_label}  dest-tls-verify: ${DEST_TLS_VERIFY}"
   debug "skip: sha=${SKIP_SHA} preflight=${SKIP_PREFLIGHT} mirror=${SKIP_MIRROR}"
   debug "extra-values: ${EXTRA_VALUES[*]:-<none>}"
   debug "extra-sets:   ${EXTRA_SETS[*]:-<none>}"
@@ -264,7 +288,7 @@ else
   fi
   log "    清单镜像数: ${img_count}"
   log "    本地 archive: ${archive_count} 个，总大小 ${total_size}"
-  log "    目标 registry: ${DEST_REG} (tls-verify=${DEST_TLS_VERIFY}, use-skopeo=${USE_SKOPEO})"
+  log "    目标 registry: ${DEST_REG} (tls-verify=${DEST_TLS_VERIFY}, cli=${_cli_label:-auto})"
   if [ "${VERBOSE}" -eq 1 ]; then
     debug "镜像清单："
     grep -vE '^[[:space:]]*(#|$)' "${IMG_LIST}" | sed 's/^/      - /' || true
@@ -284,9 +308,12 @@ else
     "DEST_TLS_VERIFY=${DEST_TLS_VERIFY}"
     "IMAGES_LIST=${IMG_LIST}"
   )
-  [ -n "${DEST_USER}" ]     && mirror_env+=("DEST_USER=${DEST_USER}")
-  [ "${USE_SKOPEO}" -eq 1 ] && mirror_env+=("USE_SKOPEO=1")
-  [ "${DRY_RUN}" -eq 1 ]    && mirror_env+=("DRY_RUN=1")
+  [ -n "${DEST_USER}" ]      && mirror_env+=("DEST_USER=${DEST_USER}")
+  [ "${USE_SKOPEO}"  -eq 1 ] && mirror_env+=("USE_SKOPEO=1")
+  [ "${USE_NERDCTL}" -eq 1 ] && mirror_env+=("USE_NERDCTL=1")
+  [ "${USE_PODMAN}"  -eq 1 ] && mirror_env+=("USE_PODMAN=1")
+  [ "${USE_DOCKER}"  -eq 1 ] && mirror_env+=("USE_DOCKER=1")
+  [ "${DRY_RUN}"     -eq 1 ] && mirror_env+=("DRY_RUN=1")
   debug "mirror env: ${mirror_env[*]}"
 
   # 调用 mirror-images.sh，不让其失败导致整个脚本 ERR trap 触发两次
@@ -302,7 +329,7 @@ else
     err "mirror-images.sh 失败 (rc=${mir_rc})"
     case "${mir_rc}" in
       2) err "  → 参数 / 路径错误：检查 FROM_DIR 与 IMAGES_LIST" ;;
-      3) err "  → 缺工具：USE_SKOPEO=1 但未安装 skopeo，或未启用 USE_SKOPEO 但缺 docker" ;;
+      3) err "  → 缺工具：检查 skopeo / nerdctl / docker / podman 是否至少安装一个；或显式 --use-* 指向已安装的 CLI" ;;
       4) err "  → 密码为空" ;;
       5) err "  → archive 缺失：可能 bundle 不完整或 images.list 与 build 时不一致" ;;
     esac
