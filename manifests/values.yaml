@@ -104,6 +104,8 @@ metrics:
     labels: {}
     relabelings: []
   grafanaDashboard:
+    # 是否渲染 vLLM dashboard ConfigMap（label=grafana_dashboard=1，被 Grafana sidecar 自动加载）。
+    # 注意：当 grafana.enabled=true 时，此项会被联动认为 true（无需手动开启）。
     enabled: false
 
 podAnnotations: {}
@@ -236,3 +238,91 @@ prometheus:
             target_label: namespace
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
+
+# 可选 Grafana 子 chart（grafana/grafana 10.5.15，appVersion 12.3.1）。默认关闭。
+# 设计参考：docs/superpowers/specs/2026-05-27-grafana-optional.md
+# - 默认开启 dashboard sidecar（kiwigrid/k8s-sidecar）：自动发现 label=grafana_dashboard=1 的 ConfigMap。
+# - 默认 Prometheus datasource 指向本 chart 部署的 prometheus-server Service，无需用户手填。
+# - 上游不识别 global.imageRegistry，离线场景需在 image.repository / sidecar.image.repository 单独覆盖。
+# - admin 默认密码：未显式设置 adminPassword 时由子 chart 自动生成，可通过下面命令取出：
+#     kubectl -n <ns> get secret <release>-grafana -o jsonpath='{.data.admin-password}' | base64 -d
+# - 已开启 KPS 或自带 Grafana 的客户：保持 enabled=false 即可，仅由 metrics.grafanaDashboard 投递 dashboard。
+grafana:
+  enabled: false
+
+  # ---- 镜像（离线/私有仓覆盖示例，取消注释并改成你的私有仓）----
+  image:
+    registry: docker.io
+    repository: grafana/grafana
+    # tag: ""                         # 留空跟随 chart appVersion (12.3.1)
+    pullPolicy: IfNotPresent
+    # registry: my-reg.io
+    # repository: llm/grafana
+
+  # ---- 管理员凭据：优先使用外部已存 Secret ----
+  admin:
+    existingSecret: ""               # 非空：使用该 Secret 中的 admin-user / admin-password 字段
+    userKey: admin-user
+    passwordKey: admin-password
+  # 留空 existingSecret 时由子 chart 生成随机密码到 <release>-grafana Secret
+  # adminUser: admin
+  # adminPassword: ""                # 不建议直接写明文，优先 existingSecret
+
+  # ---- 持久化：默认 emptyDir，生产建议 PVC ----
+  persistence:
+    enabled: false
+    # size: 10Gi
+    # storageClassName: ""
+
+  # ---- 暴露：默认 ClusterIP，按需开 Ingress / NodePort ----
+  service:
+    type: ClusterIP
+    port: 80
+
+  ingress:
+    enabled: false
+    ingressClassName: ""
+    hosts: []                        # 不给默认占位 host，避免误用
+    tls: []
+
+  # ---- 资源（轻量默认）----
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # ---- Dashboard sidecar：自动发现 ConfigMap 标签匹配的仪表盘 ----
+  sidecar:
+    image:
+      registry: quay.io
+      repository: kiwigrid/k8s-sidecar
+      tag: 2.5.0
+      # registry: my-reg.io
+      # repository: llm/k8s-sidecar
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      folder: /tmp/dashboards
+      provider:
+        allowUiUpdates: false
+    datasources:
+      enabled: false                 # 我们用 datasources 字段直接渲染，不走 sidecar 扫描
+
+  # ---- 默认 Datasource：指向本 chart 的 prometheus-server Service ----
+  # 注意：prometheus sub-chart 的 server.fullnameOverride=prometheus-server，
+  # 因此最终 Service 名为 "prometheus-server"（不带 release 前缀），下方 url 已对齐。
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          isDefault: true
+          url: http://prometheus-server.{{ .Release.Namespace }}.svc:80
+          editable: false
