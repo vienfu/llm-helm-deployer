@@ -1,4 +1,10 @@
-{{- if .Values.metrics.grafanaDashboard.enabled -}}
+{{- /*
+渲染条件：
+1) 用户显式 `metrics.grafanaDashboard.enabled=true`（外接 Grafana 场景）；或
+2) 启用了内置 grafana sub-chart（`grafana.enabled=true`）——此时 sidecar 自动加载本 ConfigMap，避免用户额外开第二个开关。
+任一条件成立即渲染，仍可通过 `metrics.grafanaDashboard.enabled=false` 显式关闭——但若只关此项而未关 grafana.enabled，仍会渲染（联动语义优先于显式关闭，避免内置 Grafana 启动后仪表盘空白）。
+*/ -}}
+{{- if or .Values.metrics.grafanaDashboard.enabled (and (hasKey .Values "grafana") .Values.grafana.enabled) -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
