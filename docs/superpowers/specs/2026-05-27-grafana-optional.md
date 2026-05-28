@@ -69,8 +69,8 @@ parent chart (llm-vllm)
 ### 4.2 选用上游 chart
 
 - 上游：`grafana/grafana`（官方维护，独立于 KPS）
-- 仓库：`https://grafana.github.io/helm-charts`
-- 锁定版本：以提交本 spec 时上游 stable 为准（建议 `~9.0.0`，appVersion 11.x）；具体版本号在实施 PR 中冻结，记录到 [Chart.yaml](../../../manifests/Chart.yaml) 与 [Chart.lock](../../../manifests/Chart.lock)。
+- 仓库：`https://grafana-community.github.io/helm-charts`（自 2026-01 上游迁出原 `grafana/helm-charts` 至 `grafana-community/helm-charts`）
+- 锁定版本：`12.4.1`（appVersion `13.0.1-security-01`），具体版本号在实施 PR 中冻结，记录到 [Chart.yaml](../../../manifests/Chart.yaml) 与 [Chart.lock](../../../manifests/Chart.lock)。
 - 拒绝：`kube-prometheus-stack` 内嵌 Grafana（与 monitoring-simplify 决策冲突，会重新引入 Operator/CRD）。
 
 ### 4.3 Chart.yaml 增量
@@ -82,8 +82,8 @@ dependencies:
     repository: https://prometheus-community.github.io/helm-charts
     condition: prometheus.enabled
   - name: grafana                       # ★ 新增
-    version: ~9.0.0                     # 实施 PR 中冻结具体小版本
-    repository: https://grafana.github.io/helm-charts
+    version: 12.4.1                      # 实施 PR 中冻结具体小版本（appVersion 13.0.1-security-01）
+    repository: https://grafana-community.github.io/helm-charts
     condition: grafana.enabled
 ```
 

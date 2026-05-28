@@ -66,7 +66,7 @@ assert_rc() {
 FIXTURE_IMAGES_LIST="docker.io/vllm/vllm-openai:v0.6.3
 docker.io/curlimages/curl:8.10.1
 quay.io/prometheus/prometheus:v3.11.3
-docker.io/grafana/grafana:12.3.1
+docker.io/grafana/grafana:13.0.1-security-01
 quay.io/kiwigrid/k8s-sidecar:2.5.0"
 
 make_fake_bundle() {
@@ -230,9 +230,9 @@ out=$(run_capture "" "${BUNDLE}/install.sh" \
   --skip-sha --skip-preflight --dry-run); rc=$?
 assert_rc "${rc}" "0" "install→mirror(grafana): dry-run 退出码 0"
 mirror_section=$(printf '%s\n' "${out}" | awk '/\[3\/5\]/,/\[4\/5\]/')
-assert_contains "${mirror_section}" "docker.io/grafana/grafana:12.3.1" \
-  "install→mirror(grafana): 含 grafana/grafana:12.3.1 源镜像"
-assert_contains "${mirror_section}" "my-reg.io/llm/grafana:12.3.1" \
+assert_contains "${mirror_section}" "docker.io/grafana/grafana:13.0.1-security-01" \
+  "install→mirror(grafana): 含 grafana/grafana:13.0.1-security-01 源镜像"
+assert_contains "${mirror_section}" "my-reg.io/llm/grafana:13.0.1-security-01" \
   "install→mirror(grafana): grafana 重写到目标 registry（扁平化）"
 assert_contains "${mirror_section}" "quay.io/kiwigrid/k8s-sidecar:2.5.0" \
   "install→mirror(grafana): 含 k8s-sidecar 源镜像"
