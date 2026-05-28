@@ -16,13 +16,15 @@
 | NVIDIA device plugin | 让 K8s 能调度 `nvidia.com/gpu` | 默认（`nvidia-device-plugin.enabled=false`） | `--set nvidia-device-plugin.enabled=true` |
 | dcgm-exporter | 暴露 GPU 显存等硬件指标 | 默认（`dcgm-exporter.enabled=false`） | `--set dcgm-exporter.enabled=true` |
 | Prometheus（单实例） | 抓取 vLLM Pod 指标（annotation-based） | 默认（`prometheus.enabled=false`） | `--set prometheus.enabled=true` |
+| Grafana（轻量可视化） | 加载内置 vLLM dashboard，自动连 Prometheus | 默认（`grafana.enabled=false`） | `--set grafana.enabled=true` 或 `tools/install.sh --with-grafana` |
 
-> 三段子 chart 的所有 values 均可在对应顶层段下透传，例如调小 prometheus 保留期：`--set prometheus.server.retention=3d`。
+> 四段子 chart 的所有 values 均可在对应顶层段下透传，例如调小 prometheus 保留期：`--set prometheus.server.retention=3d`，或切 grafana service type：`--set grafana.service.type=NodePort`。
 >
 > **如何调子 chart：** 直接在 [`manifests/values.yaml`](./manifests/values.yaml) 同名段下加字段即可（已预置常用项：调度、scrape annotation、retention 等）。完整字段见各 upstream values.yaml：
 > - [nvidia-device-plugin](https://github.com/NVIDIA/k8s-device-plugin/blob/main/deployments/helm/nvidia-device-plugin/values.yaml)
 > - [dcgm-exporter](https://github.com/NVIDIA/dcgm-exporter/blob/main/deployment/values.yaml)
 > - [prometheus](https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus/values.yaml)
+> - [grafana](https://github.com/grafana-community/helm-charts/blob/main/charts/grafana/values.yaml)（自 2026-01 上游迁至 `grafana-community/helm-charts`）
 
 ## 快速开始
 
@@ -53,7 +55,8 @@ helm install my-llm ./manifests -n llm --create-namespace \
   --set 'nodeSelector.kubernetes\.io/hostname=gpu-node-1' \
   --set nvidia-device-plugin.enabled=true \
   --set dcgm-exporter.enabled=true \
-  --set prometheus.enabled=true
+  --set prometheus.enabled=true \
+  --set grafana.enabled=true        # 内置 grafana + 自动加载 vLLM dashboard
 ```
 
 测试：
@@ -81,13 +84,16 @@ helm test my-llm
 | `service.type` | ClusterIP | |
 | `ingress.enabled` | false | |
 | `metrics.serviceMonitor.enabled` | true | 是否给 vLLM Pod 注入 `prometheus.io/scrape` annotation（字段名沿用旧称以保留向后兼容；不再渲染 ServiceMonitor） |
-| `metrics.grafanaDashboard.enabled` | false | |
+| `metrics.grafanaDashboard.enabled` | false | 是否渲染 vLLM dashboard ConfigMap（label `grafana_dashboard=1`）。**注意**：当 `grafana.enabled=true` 时本字段会被联动认为 true，无需显式开启 |
 | `nodeSelector` / `tolerations` / `affinity` | {} / [] / {} | hostPath 模式下务必配置 nodeSelector |
 | `schedulerName` | "" | Pod 调度器名称，留空走 K8s 默认调度器；可填 `volcano` / `kai-scheduler` 等 |
 | `shm.sizeLimit` | 8Gi | `/dev/shm` 大小，TP 大模型需要 |
 | `nvidia-device-plugin.enabled` | false | 是否安装 NVIDIA device plugin DaemonSet |
 | `dcgm-exporter.enabled` | false | 是否安装 dcgm-exporter |
 | `prometheus.enabled` | false | 是否安装单实例 Prometheus（基于 prometheus-community/prometheus，关闭 alertmanager/pushgateway/node-exporter/kube-state-metrics） |
+| `grafana.enabled` | false | 是否安装内置 Grafana（基于 grafana-community/grafana 12.4.1，appVersion 13.0.1-security-01）；启用后 sidecar 自动加载 vLLM dashboard，datasource 默认指向 `prometheus-server.<ns>.svc:80` |
+| `grafana.adminPassword` | `admin` | 默认 admin 密码；生产环境建议改用 `grafana.admin.existingSecret` 走 Secret 注入 |
+| `grafana.service.type` | ClusterIP | 切换为 `NodePort` / `LoadBalancer` 可外部访问 |
 | `global.imageRegistry` | "" | 离线/私有 registry 镜像前缀（详见下方「离线 / 私有 registry 部署」） |
 | `global.imagePullSecrets` | [] | 全局 pull secrets，会与顶层 `imagePullSecrets` 合并 |
 
@@ -140,6 +146,7 @@ helm install my-llm ./manifests -n llm --create-namespace \
 | `prometheus` | ❌ | 需显式覆盖 `--set prometheus.server.image.repository=my-reg.io.example/llm/prometheus` 以及 `--set prometheus.server.configmapReload.prometheus.image.repository=my-reg.io.example/llm/prometheus-config-reloader` |
 | `nvidia-device-plugin` | ❌ | 需显式覆盖 `--set nvidia-device-plugin.image.repository=my-reg.io.example/llm/k8s-device-plugin` |
 | `dcgm-exporter` | ❌ | 需显式覆盖 `--set dcgm-exporter.image.repository=my-reg.io.example/llm/dcgm-exporter` |
+| `grafana` | ❌ | 仅当 `grafana.enabled=true` 时需要：`--set grafana.image.repository=my-reg.io.example/llm/grafana` 以及 `--set grafana.sidecar.image.repository=my-reg.io.example/llm/k8s-sidecar` |
 
 > `mirror-images.sh` 把镜像扁平化到 `${DEST_REG}/<image>:<tag>`，因此覆盖路径只需 `${DEST_REG}/<image>`，不再嵌套 `nvidia/k8s/...` 等多级目录。脚本结束时会打印对应的 `--set` 命令，可直接复制使用。
 
@@ -177,7 +184,9 @@ kubectl delete crd \
   thanosrulers.monitoring.coreos.com
 ```
 
-> 如继续需要 Operator 风格（ServiceMonitor / PodMonitor / Alertmanager / Grafana 全家桶），请独立安装 kube-prometheus-stack（不再由本 chart 托管），并在外部配置同样的 annotation 抓取或 PodMonitor 规则。
+> 如继续需要 Operator 风格（ServiceMonitor / PodMonitor / Alertmanager），请独立安装 kube-prometheus-stack（不再由本 chart 托管），并在外部配置同样的 annotation 抓取或 PodMonitor 规则。
+>
+> 如仅需 Grafana 可视化（不要 Operator / Alertmanager），可直接 `--set grafana.enabled=true` 启用本 chart 内置的轻量 Grafana sub-chart，会自动加载 vLLM dashboard 并连上本 chart 的 Prometheus，不再依赖 KPS。
 
 ## 已知限制（首版）
 

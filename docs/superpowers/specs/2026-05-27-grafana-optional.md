@@ -213,7 +213,7 @@ docker.io/library/busybox:<frozen-tag>            # init container
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
-| grafana chart 版本未冻结导致离线 bundle 漂移 | 镜像 tag 不一致 → mirror 失败 | 实施 PR 中 `~9.0.0` → 冻结到具体 patch 版本，记录 Chart.lock |
+| grafana chart 版本未冻结导致离线 bundle 漂移 | 镜像 tag 不一致 → mirror 失败 | 实施 PR 中冻结到具体 patch 版本（已锁 `12.4.1`），记录 Chart.lock |
 | 上游 chart 修改默认 sidecar label key | 现有 dashboard ConfigMap 失效 | values.yaml 显式 `sidecar.dashboards.label/labelValue`，覆盖上游默认 |
 | Datasource URL 在不同 release name 下错误 | Grafana 起来了但抓不到指标 | 用 `{{ .Release.Name }}-prometheus-server` 模板化，并在 helm-static-test 渲染断言 |
 | 客户已开 KPS，又开本 sub-chart 导致双 Grafana | 资源冲突，dashboard 重复 | README 显式建议互斥；values 注释提示 |

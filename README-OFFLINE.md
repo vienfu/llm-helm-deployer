@@ -54,6 +54,7 @@ cd llm-deployer-bundle-<ver>
   --create-pull-secret \
   -n llm --release my-llm \
   --use-skopeo \
+  --with-grafana \
   --set model.name=/models/Qwen2.5-7B-Instruct \
   --set model.hostPath.path=/data/models
 # 脚本会一次性提示「请输入镜像仓库密码」，密码绝不入 env / 命令行 / shell 历史
@@ -62,6 +63,9 @@ cd llm-deployer-bundle-<ver>
 #   --use-nerdctl   （containerd 节点常用，可配合 NERDCTL_NAMESPACE=k8s.io）
 #   --use-podman
 #   --use-docker
+#
+# 不需要 Grafana 可视化？去掉 --with-grafana 即可（默认关闭）。
+# 也可改用 --set grafana.enabled=true 等价显式形式。
 #   都不指定时，mirror-images.sh 会按 skopeo > nerdctl > docker > podman 自动选择
 ```
 

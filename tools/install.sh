@@ -35,6 +35,8 @@
 #                               （都不指定时 mirror-images.sh 自动检测：skopeo > nerdctl > docker > podman）
 #   --values <file>             附加 -f <file>（可重复）
 #   --set <kv>                  附加 --set kv（可重复）
+#   --with-grafana              快捷开关：等价 --set grafana.enabled=true
+#                               （内置 grafana sub-chart，自动加载 vLLM dashboard）
 #   --skip-sha                  跳过 SHA256SUMS 校验
 #   --skip-preflight            跳过 preflight
 #   --skip-mirror               跳过镜像同步
@@ -86,6 +88,7 @@ while [ $# -gt 0 ]; do
     --use-docker)          USE_DOCKER=1; shift ;;
     --values)              EXTRA_VALUES+=("$2"); shift 2 ;;
     --set)                 EXTRA_SETS+=("$2"); shift 2 ;;
+    --with-grafana)        EXTRA_SETS+=("grafana.enabled=true"); shift ;;
     --skip-sha)            SKIP_SHA=1; shift ;;
     --skip-preflight)      SKIP_PREFLIGHT=1; shift ;;
     --skip-mirror)         SKIP_MIRROR=1; shift ;;

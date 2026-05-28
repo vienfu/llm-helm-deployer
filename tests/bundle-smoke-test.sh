@@ -250,6 +250,16 @@ out=$(run_capture "" "${BUNDLE}/install.sh" \
 assert_rc "${rc}" "0" "install: --set grafana.enabled=false dry-run 退出码 0"
 assert_contains "${out}" "grafana.enabled=false" "install: --set grafana.enabled=false 透传到 helm 命令"
 
+# 4h. --with-grafana 快捷开关：等价 --set grafana.enabled=true
+out=$(run_capture "" "${BUNDLE}/install.sh" \
+  --dest-reg my-reg.io/llm \
+  --use-docker \
+  --skip-sha --skip-preflight --skip-mirror --dry-run \
+  --with-grafana); rc=$?
+assert_rc "${rc}" "0" "install: --with-grafana dry-run 退出码 0"
+assert_contains "${out}" "grafana.enabled=true" \
+  "install: --with-grafana 透传为 --set grafana.enabled=true"
+
 echo
 echo "==> 结果: PASS=${PASS} FAIL=${FAIL}"
 if [ "${FAIL}" -gt 0 ]; then
