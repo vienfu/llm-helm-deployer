@@ -143,5 +143,5 @@ helm upgrade --install my-llm ./chart/llm-helm-deployer-*.tgz \
 
 ```bash
 ./tests/bundle-smoke-test.sh
-# 期望: PASS=37 FAIL=0
+# 期望: PASS=46 FAIL=0
 ```
