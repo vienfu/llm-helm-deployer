@@ -16,3 +16,9 @@ nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04
 # server 主镜像 + sidecar config-reloader（chart 默认注入，离线场景必须同步）
 quay.io/prometheus/prometheus:v3.11.3
 quay.io/prometheus-operator/prometheus-config-reloader:v0.91.0
+
+# grafana 10.5.15 (AppVersion 12.3.1) — 仅当 grafana.enabled=true 时需要
+# server 主镜像 + dashboard sidecar (kiwigrid/k8s-sidecar)
+# 默认开关关闭；如启用，build-bundle.sh 会同时打包以下镜像
+docker.io/grafana/grafana:12.3.1
+quay.io/kiwigrid/k8s-sidecar:2.5.0

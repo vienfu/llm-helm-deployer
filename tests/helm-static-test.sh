@@ -143,13 +143,15 @@ echo "$out" | yq 'select(.kind == "Deployment" and .metadata.name == "t-promethe
   | grep -q "^my-reg.io/prometheus/prometheus" || fail "prometheus.server.image.repository override not honored"
 pass "prometheus.server.image.repository override honored"
 
-# 离线镜像清单约束：监控段 = prometheus + config-reloader = 2 行（无 alertmanager/grafana/ksm/node-exporter/operator）
-mon_count=$(grep -E '^[^#]' ../tools/images.list | grep -E 'prometheus|grafana|alertmanager|node-exporter|kube-state-metrics' | wc -l | tr -d ' ')
-[ "$mon_count" = "2" ] || fail "tools/images.list monitoring image count should be 2 (prometheus + config-reloader), got: $mon_count"
-# 不应再出现 KPS 大件
-if grep -E '^[^#]' ../tools/images.list | grep -qE 'grafana|alertmanager|node-exporter|kube-state-metrics|prometheus-operator:'; then
+# 离线镜像清单约束：监控段 = prometheus + config-reloader + grafana + k8s-sidecar = 4 行
+# 不应再出现 KPS 大件 (alertmanager/node-exporter/kube-state-metrics/prometheus-operator/thanos)
+mon_count=$(grep -E '^[^#]' ../tools/images.list | grep -E 'prometheus|grafana|k8s-sidecar|alertmanager|node-exporter|kube-state-metrics' | wc -l | tr -d ' ')
+[ "$mon_count" = "4" ] || fail "tools/images.list monitoring image count should be 4 (prometheus + config-reloader + grafana + k8s-sidecar), got: $mon_count"
+# 不应再出现 KPS 大件（注意 prometheus-operator 这个仓里既有 config-reloader 也有 operator 主体，
+# 故只禁 ":" 后跟 operator-tag 的形式，避免误伤 prometheus-config-reloader）
+if grep -E '^[^#]' ../tools/images.list | grep -qE 'alertmanager|node-exporter|kube-state-metrics|prometheus-operator/prometheus-operator|thanos'; then
   fail "tools/images.list still contains KPS heavy components"
 fi
-pass "images.list monitoring slice slimmed"
+pass "images.list monitoring slice slimmed (prometheus + grafana lite)"
 
 pass "all static tests passed"
