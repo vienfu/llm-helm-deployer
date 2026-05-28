@@ -1,0 +1,180 @@
+tests/bundle-smoke-test.sh
+  8b3e277f03fd32fc 69,233-235 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a180ad4c4ad8aa4d1005ce7","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":69},{"Range":[233,235]}]}]}
+manifests/Chart.yaml
+  8b3e277f03fd32fc 32-33 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a180ad4c4ad8aa4d1005ce7","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[32,33]}]}]}
+docs/superpowers/specs/2026-05-27-grafana-optional.md
+  8b3e277f03fd32fc 72-73,85-86 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a180ad4c4ad8aa4d1005ce7","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[72,73]},{"Range":[85,86]}]}]}
+tools/images.list
+  8b3e277f03fd32fc 20-21,24 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a180ad4c4ad8aa4d1005ce7","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[20,21]},{"Single":24}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "0634adf0cb2d1e997338458c6e9aa483005f9d77",
+  "prompts": {
+    "8b3e277f03fd32fc": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0aa400c4ad8aa4d1004baf",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "fuchunhui <fuchunhui@bytedance.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 12,
+      "accepted_lines": 123,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "docs/superpowers/specs/2026-05-27-grafana-optional.md": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              72,
+              73
+            ]
+          },
+          {
+            "Range": [
+              85,
+              86
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a180ad4c4ad8aa4d1005ce7",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  72,
+                  73
+                ]
+              },
+              {
+                "Range": [
+                  85,
+                  86
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "manifests/Chart.yaml": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              32,
+              33
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a180ad4c4ad8aa4d1005ce7",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  32,
+                  33
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tests/bundle-smoke-test.sh": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Single": 69
+          },
+          {
+            "Range": [
+              233,
+              235
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a180ad4c4ad8aa4d1005ce7",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 69
+              },
+              {
+                "Range": [
+                  233,
+                  235
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tools/images.list": [
+      {
+        "hash": "8b3e277f03fd32fc",
+        "line_ranges": [
+          {
+            "Range": [
+              20,
+              21
+            ]
+          },
+          {
+            "Single": 24
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a180ad4c4ad8aa4d1005ce7",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  20,
+                  21
+                ]
+              },
+              {
+                "Single": 24
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "8b3e277f03fd32fc": {
+      "tool": "trae",
+      "conversation_id": "6a0aa400c4ad8aa4d1004baf",
+      "session_id": "6a0aa400c4ad8aa4d1004baf",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
