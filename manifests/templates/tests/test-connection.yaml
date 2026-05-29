@@ -15,7 +15,7 @@ spec:
   {{- end }}
   containers:
     - name: curl
-      image: "{{ if and .Values.global .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}curlimages/curl:8.10.1"
+      image: "{{ if and .Values.global .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/curl:8.10.1"
       command: ["/bin/sh", "-c"]
       args:
         - |

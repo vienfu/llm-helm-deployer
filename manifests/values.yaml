@@ -250,6 +250,9 @@ prometheus:
 grafana:
   enabled: false
 
+  # 固定 Deployment / Service 名为 "grafana"，避免带 release 前缀
+  fullnameOverride: grafana
+
   # ---- 镜像（离线/私有仓覆盖示例，取消注释并改成你的私有仓）----
   image:
     registry: ""

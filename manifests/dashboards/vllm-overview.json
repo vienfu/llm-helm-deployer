@@ -1,8 +1,8 @@
 {
-  "title": "vLLM Overview",
+  "title": "Model Metrics Overview",
   "uid": "vllm-overview",
   "schemaVersion": 38,
-  "version": 5,
+  "version": 6,
   "editable": true,
   "timezone": "",
   "refresh": "30s",
