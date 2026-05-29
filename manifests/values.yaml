@@ -252,8 +252,8 @@ grafana:
 
   # ---- 镜像（离线/私有仓覆盖示例，取消注释并改成你的私有仓）----
   image:
-    registry: docker.io
-    repository: grafana/grafana
+    registry: ""
+    repository: grafana
     # tag: ""                         # 留空跟随 chart appVersion (12.3.1)
     pullPolicy: IfNotPresent
     # registry: my-reg.io
@@ -297,8 +297,8 @@ grafana:
   # ---- Dashboard sidecar：自动发现 ConfigMap 标签匹配的仪表盘 ----
   sidecar:
     image:
-      registry: quay.io
-      repository: kiwigrid/k8s-sidecar
+      registry: ""
+      repository: k8s-sidecar
       tag: 2.5.0
       # registry: my-reg.io
       # repository: llm/k8s-sidecar
