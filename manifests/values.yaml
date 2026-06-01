@@ -34,7 +34,44 @@ vllm:
   dtype: auto
   trustRemoteCode: false
   port: 8000
-  extraArgs: []
+
+  # ---- 通用性能调优（dense / MoE 通用）----
+  # 留空字符串 "" 表示不下发，跟随 vLLM 默认值
+  enablePrefixCaching: true        # --enable-prefix-caching：多轮/RAG 命中可大幅降低 TTFT
+  enableChunkedPrefill: ""         # --enable-chunked-prefill 或 --no-enable-chunked-prefill；留空走 V1 默认
+  maxNumBatchedTokens: ""          # --max-num-batched-tokens：单步 forward 总 token 预算，影响吞吐
+  maxNumPartialPrefills: ""        # --max-num-partial-prefills：同时分块 prefill 的请求数（V1）
+  swapSpace: ""                    # --swap-space (GiB)：抢占请求 KV 暂存空间
+  blockSize: ""                    # --block-size：KV cache block 大小（16/32），长上下文建议 32
+  kvCacheDtype: ""                 # --kv-cache-dtype：auto/fp8/fp8_e4m3/fp8_e5m2，fp8 可使 KV 容量翻倍
+  calculateKvScales: false         # --calculate-kv-scales：与 fp8 KV 配套，运行时校准
+  disableLogRequests: false        # --disable-log-requests：关闭请求日志，降低 CPU 开销
+  enforceEager: false              # --enforce-eager：禁用 CUDA Graph（仅调试，生产关闭）
+
+  # ---- 量化（按需，与模型权重格式匹配）----
+  quantization: ""                 # --quantization：awq / gptq / fp8 / bitsandbytes ...
+
+  # ---- 编译优化（V1 推荐 -O3 启用 inductor）----
+  compilationLevel: ""             # -O 等级：留空=默认；3 启用 inductor，首次启动较慢但稳态更快
+
+  # ---- MoE 专用（仅多卡 MoE 模型有意义；单卡或 dense 模型保持 false）----
+  moe:
+    enableExpertParallel: false    # --enable-expert-parallel
+    expertParallelSize: ""         # --expert-parallel-size：留空 == tensorParallelSize
+    enableEplb: false              # --enable-eplb：V1 专家负载均衡，缓解热门专家拥塞
+
+  # ---- 推测解码 / MTP（按需开启；优先使用 V1 的 speculative-config）----
+  speculative:
+    enabled: false
+    # 方式 A（推荐，V1）：直接传 JSON 字符串到 --speculative-config
+    # 例：'{"method":"mtp","num_speculative_tokens":1}' （DeepSeek-V3 等 MTP 原生模型）
+    # 例：'{"method":"draft_model","model":"/models/draft","num_speculative_tokens":4}'
+    config: ""
+    # 方式 B（兼容旧风格，仅在 config 留空时生效）
+    model: ""                      # --speculative-model：draft 模型路径
+    numTokens: ""                  # --num-speculative-tokens：推测 token 数（一般 3-5）
+
+  extraArgs: []                    # 兜底逃生口：以上未覆盖的参数从这里追加
 
 auth:
   apiKey: ""

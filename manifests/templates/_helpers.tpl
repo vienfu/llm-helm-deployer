@@ -131,6 +131,80 @@ vLLM 容器完整镜像引用：global.imageRegistry 非空时拼前缀；否则
 {{- if .Values.vllm.trustRemoteCode }}
 - --trust-remote-code
 {{- end }}
+{{- /* ---- 通用性能调优 ---- */}}
+{{- if .Values.vllm.enablePrefixCaching }}
+- --enable-prefix-caching
+{{- end }}
+{{- if kindIs "bool" .Values.vllm.enableChunkedPrefill }}
+{{- if .Values.vllm.enableChunkedPrefill }}
+- --enable-chunked-prefill
+{{- else }}
+- --no-enable-chunked-prefill
+{{- end }}
+{{- end }}
+{{- if .Values.vllm.maxNumBatchedTokens }}
+- --max-num-batched-tokens
+- {{ .Values.vllm.maxNumBatchedTokens | quote }}
+{{- end }}
+{{- if .Values.vllm.maxNumPartialPrefills }}
+- --max-num-partial-prefills
+- {{ .Values.vllm.maxNumPartialPrefills | quote }}
+{{- end }}
+{{- if ne (toString (.Values.vllm.swapSpace | default "")) "" }}
+- --swap-space
+- {{ .Values.vllm.swapSpace | quote }}
+{{- end }}
+{{- if .Values.vllm.blockSize }}
+- --block-size
+- {{ .Values.vllm.blockSize | quote }}
+{{- end }}
+{{- if .Values.vllm.kvCacheDtype }}
+- --kv-cache-dtype
+- {{ .Values.vllm.kvCacheDtype | quote }}
+{{- end }}
+{{- if .Values.vllm.calculateKvScales }}
+- --calculate-kv-scales
+{{- end }}
+{{- if .Values.vllm.disableLogRequests }}
+- --disable-log-requests
+{{- end }}
+{{- if .Values.vllm.enforceEager }}
+- --enforce-eager
+{{- end }}
+{{- /* ---- 量化 ---- */}}
+{{- if .Values.vllm.quantization }}
+- --quantization
+- {{ .Values.vllm.quantization | quote }}
+{{- end }}
+{{- /* ---- 编译优化 ---- */}}
+{{- if ne (toString (.Values.vllm.compilationLevel | default "")) "" }}
+- {{ printf "-O%v" .Values.vllm.compilationLevel | quote }}
+{{- end }}
+{{- /* ---- MoE ---- */}}
+{{- if and .Values.vllm.moe .Values.vllm.moe.enableExpertParallel }}
+- --enable-expert-parallel
+{{- if .Values.vllm.moe.expertParallelSize }}
+- --expert-parallel-size
+- {{ .Values.vllm.moe.expertParallelSize | quote }}
+{{- end }}
+{{- end }}
+{{- if and .Values.vllm.moe .Values.vllm.moe.enableEplb }}
+- --enable-eplb
+{{- end }}
+{{- /* ---- 推测解码 / MTP ---- */}}
+{{- if and .Values.vllm.speculative .Values.vllm.speculative.enabled }}
+{{- if .Values.vllm.speculative.config }}
+- --speculative-config
+- {{ .Values.vllm.speculative.config | quote }}
+{{- else if .Values.vllm.speculative.model }}
+- --speculative-model
+- {{ .Values.vllm.speculative.model | quote }}
+{{- if .Values.vllm.speculative.numTokens }}
+- --num-speculative-tokens
+- {{ .Values.vllm.speculative.numTokens | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- if .Values.auth.apiKey }}
 - --api-key
 - $(VLLM_API_KEY)
